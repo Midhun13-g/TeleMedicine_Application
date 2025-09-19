@@ -1,0 +1,405 @@
+{
+  "Fungal infection": [
+    "itching",
+    "dischromic__patches",
+    "nodal_skin_eruptions",
+    "skin_rash"
+  ],
+  "Allergy": [
+    "chills",
+    "shivering",
+    "continuous_sneezing",
+    "watering_from_eyes"
+  ],
+  "GERD": [
+    "cough",
+    "stomach_pain",
+    "ulcers_on_tongue",
+    "chest_pain",
+    "acidity",
+    "vomiting"
+  ],
+  "Chronic cholestasis": [
+    "yellowish_skin",
+    "itching",
+    "loss_of_appetite",
+    "abdominal_pain",
+    "nausea",
+    "yellowing_of_eyes",
+    "vomiting"
+  ],
+  "Drug Reaction": [
+    "stomach_pain",
+    "itching",
+    "skin_rash",
+    "burning_micturition",
+    "spotting__urination"
+  ],
+  "Peptic ulcer diseae": [
+    "loss_of_appetite",
+    "abdominal_pain",
+    "indigestion",
+    "passage_of_gases",
+    "vomiting",
+    "internal_itching"
+  ],
+  "AIDS": [
+    "extra_marital_contacts",
+    "patches_in_throat",
+    "muscle_wasting",
+    "high_fever"
+  ],
+  "Diabetes ": [
+    "blurred_and_distorted_vision",
+    "fatigue",
+    "polyuria",
+    "weight_loss",
+    "obesity",
+    "restlessness",
+    "lethargy",
+    "excessive_hunger",
+    "irregular_sugar_level",
+    "increased_appetite"
+  ],
+  "Gastroenteritis": [
+    "dehydration",
+    "diarrhoea",
+    "vomiting",
+    "sunken_eyes"
+  ],
+  "Bronchial Asthma": [
+    "family_history",
+    "fatigue",
+    "cough",
+    "breathlessness",
+    "mucoid_sputum",
+    "high_fever"
+  ],
+  "Hypertension ": [
+    "headache",
+    "dizziness",
+    "loss_of_balance",
+    "chest_pain",
+    "lack_of_concentration"
+  ],
+  "Migraine": [
+    "blurred_and_distorted_vision",
+    "headache",
+    "depression",
+    "visual_disturbances",
+    "stiff_neck",
+    "indigestion",
+    "irritability",
+    "acidity",
+    "excessive_hunger"
+  ],
+  "Cervical spondylosis": [
+    "neck_pain",
+    "weakness_in_limbs",
+    "back_pain",
+    "dizziness",
+    "loss_of_balance"
+  ],
+  "Paralysis (brain hemorrhage)": [
+    "altered_sensorium",
+    "weakness_of_one_body_side",
+    "headache",
+    "vomiting"
+  ],
+  "Jaundice": [
+    "dark_urine",
+    "fatigue",
+    "yellowish_skin",
+    "itching",
+    "weight_loss",
+    "abdominal_pain",
+    "high_fever",
+    "vomiting"
+  ],
+  "Malaria": [
+    "chills",
+    "diarrhoea",
+    "headache",
+    "muscle_pain",
+    "nausea",
+    "high_fever",
+    "vomiting",
+    "sweating"
+  ],
+  "Chicken pox": [
+    "fatigue",
+    "headache",
+    "itching",
+    "swelled_lymph_nodes",
+    "loss_of_appetite",
+    "red_spots_over_body",
+    "malaise",
+    "skin_rash",
+    "lethargy",
+    "high_fever",
+    "mild_fever"
+  ],
+  "Dengue": [
+    "chills",
+    "fatigue",
+    "high_fever",
+    "headache",
+    "pain_behind_the_eyes",
+    "muscle_pain",
+    "back_pain",
+    "loss_of_appetite",
+    "nausea",
+    "red_spots_over_body",
+    "malaise",
+    "skin_rash",
+    "joint_pain",
+    "vomiting"
+  ],
+  "Typhoid": [
+    "chills",
+    "diarrhoea",
+    "fatigue",
+    "constipation",
+    "headache",
+    "toxic_look_(typhos)",
+    "abdominal_pain",
+    "nausea",
+    "belly_pain",
+    "high_fever",
+    "vomiting"
+  ],
+  "hepatitis A": [
+    "dark_urine",
+    "diarrhoea",
+    "yellowish_skin",
+    "muscle_pain",
+    "mild_fever",
+    "loss_of_appetite",
+    "abdominal_pain",
+    "nausea",
+    "yellowing_of_eyes",
+    "joint_pain",
+    "vomiting"
+  ],
+  "Hepatitis B": [
+    "dark_urine",
+    "fatigue",
+    "yellowish_skin",
+    "receiving_unsterile_injections",
+    "receiving_blood_transfusion",
+    "itching",
+    "yellow_urine",
+    "loss_of_appetite",
+    "abdominal_pain",
+    "yellowing_of_eyes",
+    "malaise",
+    "lethargy"
+  ],
+  "Hepatitis C": [
+    "family_history",
+    "fatigue",
+    "yellowish_skin",
+    "loss_of_appetite",
+    "nausea",
+    "yellowing_of_eyes"
+  ],
+  "Hepatitis D": [
+    "dark_urine",
+    "fatigue",
+    "yellowish_skin",
+    "loss_of_appetite",
+    "abdominal_pain",
+    "nausea",
+    "yellowing_of_eyes",
+    "joint_pain",
+    "vomiting"
+  ],
+  "Hepatitis E": [
+    "coma",
+    "dark_urine",
+    "fatigue",
+    "yellowish_skin",
+    "high_fever",
+    "acute_liver_failure",
+    "loss_of_appetite",
+    "abdominal_pain",
+    "nausea",
+    "yellowing_of_eyes",
+    "stomach_bleeding",
+    "joint_pain",
+    "vomiting"
+  ],
+  "Alcoholic hepatitis": [
+    "history_of_alcohol_consumption",
+    "yellowish_skin",
+    "swelling_of_stomach",
+    "fluid_overload",
+    "abdominal_pain",
+    "distention_of_abdomen",
+    "vomiting"
+  ],
+  "Tuberculosis": [
+    "chills",
+    "fatigue",
+    "cough",
+    "blood_in_sputum",
+    "swelled_lymph_nodes",
+    "mild_fever",
+    "weight_loss",
+    "loss_of_appetite",
+    "breathlessness",
+    "yellowing_of_eyes",
+    "malaise",
+    "chest_pain",
+    "phlegm",
+    "high_fever",
+    "vomiting",
+    "sweating"
+  ],
+  "Common Cold": [
+    "chills",
+    "congestion",
+    "loss_of_smell",
+    "continuous_sneezing",
+    "fatigue",
+    "headache",
+    "throat_irritation",
+    "cough",
+    "runny_nose",
+    "swelled_lymph_nodes",
+    "muscle_pain",
+    "redness_of_eyes",
+    "malaise",
+    "chest_pain",
+    "phlegm",
+    "high_fever",
+    "sinus_pressure"
+  ],
+  "Pneumonia": [
+    "chills",
+    "fast_heart_rate",
+    "fatigue",
+    "cough",
+    "breathlessness",
+    "malaise",
+    "chest_pain",
+    "rusty_sputum",
+    "phlegm",
+    "high_fever",
+    "sweating"
+  ],
+  "Dimorphic hemmorhoids(piles)": [
+    "constipation",
+    "bloody_stool",
+    "pain_in_anal_region",
+    "irritation_in_anus",
+    "pain_during_bowel_movements"
+  ],
+  "Heart attack": [
+    "breathlessness",
+    "chest_pain",
+    "vomiting",
+    "sweating"
+  ],
+  "Varicose veins": [
+    "fatigue",
+    "prominent_veins_on_calf",
+    "obesity",
+    "cramps",
+    "swollen_legs",
+    "swollen_blood_vessels",
+    "bruising"
+  ],
+  "Hypothyroidism": [
+    "mood_swings",
+    "fatigue",
+    "depression",
+    "brittle_nails",
+    "enlarged_thyroid",
+    "swollen_extremeties",
+    "abnormal_menstruation",
+    "puffy_face_and_eyes",
+    "dizziness",
+    "irritability",
+    "weight_gain",
+    "cold_hands_and_feets",
+    "lethargy"
+  ],
+  "Hyperthyroidism": [
+    "diarrhoea",
+    "mood_swings",
+    "fatigue",
+    "fast_heart_rate",
+    "weight_loss",
+    "abnormal_menstruation",
+    "irritability",
+    "restlessness",
+    "excessive_hunger",
+    "muscle_weakness",
+    "sweating"
+  ],
+  "Hypoglycemia": [
+    "blurred_and_distorted_vision",
+    "headache",
+    "fatigue",
+    "palpitations",
+    "slurred_speech",
+    "nausea",
+    "anxiety",
+    "irritability",
+    "drying_and_tingling_lips",
+    "excessive_hunger",
+    "vomiting",
+    "sweating"
+  ],
+  "Osteoarthristis": [
+    "neck_pain",
+    "hip_joint_pain",
+    "painful_walking",
+    "swelling_joints",
+    "knee_pain",
+    "joint_pain"
+  ],
+  "Arthritis": [
+    "stiff_neck",
+    "movement_stiffness",
+    "painful_walking",
+    "swelling_joints",
+    "muscle_weakness"
+  ],
+  "(vertigo) Paroymsal  Positional Vertigo": [
+    "spinning_movements",
+    "headache",
+    "unsteadiness",
+    "nausea",
+    "loss_of_balance",
+    "vomiting"
+  ],
+  "Acne": [
+    "pus_filled_pimples",
+    "blackheads",
+    "scurring",
+    "skin_rash"
+  ],
+  "Urinary tract infection": [
+    "continuous_feel_of_urine",
+    "foul_smell_of_urine",
+    "bladder_discomfort",
+    "burning_micturition"
+  ],
+  "Psoriasis": [
+    "small_dents_in_nails",
+    "inflammatory_nails",
+    "silver_like_dusting",
+    "skin_peeling",
+    "skin_rash",
+    "joint_pain"
+  ],
+  "Impetigo": [
+    "blister",
+    "yellow_crust_ooze",
+    "skin_rash",
+    "high_fever",
+    "red_sore_around_nose"
+  ]
+}

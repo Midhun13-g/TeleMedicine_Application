@@ -1,0 +1,84 @@
+package com.example.projectbackend.controller;
+
+import com.example.projectbackend.model.User;
+import com.example.projectbackend.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.Map;
+import java.util.HashMap;
+
+@RestController
+@RequestMapping("/api/auth")
+@CrossOrigin(origins = "*")
+public class AuthController {
+
+    @Autowired
+    private UserService userService;
+
+    @PostMapping("/login")
+    public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> credentials) {
+        String email = credentials.get("email");
+        String password = credentials.get("password");
+        
+        User user = userService.authenticate(email, password);
+        
+        if (user != null) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("user", Map.of(
+                "id", user.getId(),
+                "name", user.getName(),
+                "email", user.getEmail(),
+                "role", user.getRole().toString().toLowerCase(),
+                "phone", user.getPhone() != null ? user.getPhone() : "",
+                "address", user.getAddress() != null ? user.getAddress() : "",
+                "specialization", user.getSpecialization() != null ? user.getSpecialization() : "",
+                "pharmacyName", user.getPharmacyName() != null ? user.getPharmacyName() : ""
+            ));
+            return ResponseEntity.ok(response);
+        } else {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid credentials"));
+        }
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<Map<String, Object>> register(@RequestBody Map<String, Object> userData) {
+        try {
+            String email = (String) userData.get("email");
+            String password = (String) userData.get("password");
+            String name = (String) userData.get("name");
+            String roleStr = (String) userData.get("role");
+            
+            if (userService.existsByEmail(email)) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Email already exists"));
+            }
+            
+            User.Role role = User.Role.valueOf(roleStr.toUpperCase());
+            User user = new User(email, password, name, role);
+            
+            // Set role-specific fields
+            if (userData.get("phone") != null) user.setPhone((String) userData.get("phone"));
+            if (userData.get("address") != null) user.setAddress((String) userData.get("address"));
+            if (userData.get("specialization") != null) user.setSpecialization((String) userData.get("specialization"));
+            if (userData.get("licenseNumber") != null) user.setLicenseNumber((String) userData.get("licenseNumber"));
+            if (userData.get("pharmacyName") != null) user.setPharmacyName((String) userData.get("pharmacyName"));
+            
+            User savedUser = userService.save(user);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Registration successful");
+            response.put("user", Map.of(
+                "id", savedUser.getId(),
+                "name", savedUser.getName(),
+                "email", savedUser.getEmail(),
+                "role", savedUser.getRole().toString().toLowerCase()
+            ));
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Registration failed: " + e.getMessage()));
+        }
+    }
+}

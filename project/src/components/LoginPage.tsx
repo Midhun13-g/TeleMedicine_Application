@@ -4,10 +4,11 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Activity, Heart, Users, Building2, Shield, MapPin, Phone, Stethoscope, Pill, Video, Clock } from 'lucide-react';
+import { Activity, Heart, Users, Building2, Shield, MapPin, Phone, Stethoscope, Pill, Video, Clock, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import LanguageSelector from '@/components/LanguageSelector';
 import ThemeSelector from '@/components/ThemeSelector';
+import SignUpPage from '@/components/SignUpPage';
 
 const LoginPage = () => {
   const { login } = useAuth();
@@ -16,20 +17,31 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showSignUp, setShowSignUp] = useState(false);
 
-  const demoCredentials = [
-    { role: 'patient', email: 'patient@demo.com', icon: Heart, color: 'text-success' },
-    { role: 'doctor', email: 'doctor@demo.com', icon: Users, color: 'text-primary' },
-    { role: 'pharmacy', email: 'pharmacy@demo.com', icon: Building2, color: 'text-warning' },
-    { role: 'admin', email: 'admin@demo.com', icon: Shield, color: 'text-emergency' },
+  const roleButtons = [
+    { role: 'patient', icon: Heart, color: 'text-success' },
+    { role: 'doctor', icon: Users, color: 'text-primary' },
+    { role: 'pharmacy', icon: Building2, color: 'text-warning' },
+    { role: 'admin', icon: Shield, color: 'text-emergency' },
   ];
+
+  const [selectedRole, setSelectedRole] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
+    if (!selectedRole) {
+      toast({
+        title: "Role Required",
+        description: "Please select a role to login.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
     try {
-      const success = await login(email, password);
+      const success = await login(email, password, selectedRole);
       if (success) {
         toast({
           title: t('login') + " Successful",
@@ -37,8 +49,8 @@ const LoginPage = () => {
         });
       } else {
         toast({
-          title: t('login') + " Failed", 
-          description: "Invalid credentials. Please use demo credentials.",
+          title: t('login') + " Failed",
+          description: "Invalid credentials.",
           variant: "destructive",
         });
       }
@@ -53,10 +65,11 @@ const LoginPage = () => {
     }
   };
 
-  const quickLogin = (demoEmail: string) => {
-    setEmail(demoEmail);
-    setPassword('12345');
-  };
+  // quickLogin removed; login is now only via form with role selection
+
+  if (showSignUp) {
+    return <SignUpPage onBackToLogin={() => setShowSignUp(false)} />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
@@ -90,14 +103,14 @@ const LoginPage = () => {
           <div className="space-y-8 animate-slide-up">
             <div className="space-y-4">
               <h2 className="text-4xl font-bold text-foreground leading-tight">
-                Connecting Rural Communities to 
+                Connecting Rural Communities to
                 <span className="text-primary"> Quality Healthcare</span>
               </h2>
               <p className="text-lg text-muted-foreground">
-                Bridge the healthcare gap with our telemedicine platform. Get consultations, 
+                Bridge the healthcare gap with our telemedicine platform. Get consultations,
                 prescriptions, and medicine availability checks from the comfort of your village.
               </p>
-              
+
               {/* Feature highlights */}
               <div className="flex flex-wrap gap-4 mt-6">
                 <div className="flex items-center space-x-2 bg-primary/10 px-3 py-2 rounded-full">
@@ -114,7 +127,7 @@ const LoginPage = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4 animate-slide-up" style={{ animationDelay: '0.2s' }}>
               <div className="bg-card p-4 rounded-lg shadow-card hover:shadow-medical transition-shadow duration-300">
                 <div className="text-2xl font-bold text-primary">1,250+</div>
@@ -133,7 +146,7 @@ const LoginPage = () => {
                 <div className="text-sm text-muted-foreground">Success Rate</div>
               </div>
             </div>
-            
+
             {/* Trust indicators */}
             <div className="bg-gradient-subtle p-6 rounded-lg border border-border animate-slide-up" style={{ animationDelay: '0.4s' }}>
               <h3 className="font-semibold text-foreground mb-3">Trusted by Healthcare Professionals</h3>
@@ -185,10 +198,28 @@ const LoginPage = () => {
                       className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
                     />
                   </div>
-                  <Button 
-                    type="submit" 
-                    variant="medical" 
-                    className="w-full transition-all duration-300 hover:scale-105" 
+                  <div className="flex gap-2 justify-center">
+                    {roleButtons.map((roleData) => {
+                      const Icon = roleData.icon;
+                      return (
+                        <Button
+                          key={roleData.role}
+                          type="button"
+                          variant={selectedRole === roleData.role ? "medical" : "outline"}
+                          className={`flex flex-col items-center px-4 py-2 ${selectedRole === roleData.role ? 'ring-2 ring-primary' : ''}`}
+                          onClick={() => setSelectedRole(roleData.role)}
+                          disabled={loading}
+                        >
+                          <Icon className={`h-5 w-5 mb-1 ${roleData.color}`} />
+                          <span className="text-xs font-medium capitalize">{t(roleData.role)}</span>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <Button
+                    type="submit"
+                    variant="medical"
+                    className="w-full transition-all duration-300 hover:scale-105"
                     disabled={loading}
                   >
                     {loading ? t('signingIn') : t('signIn')}
@@ -204,24 +235,20 @@ const LoginPage = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  {demoCredentials.map((cred) => {
-                    const Icon = cred.icon;
-                    return (
-                      <Button
-                        key={cred.role}
-                        variant="outline"
-                        className="h-auto p-3 flex-col space-y-2 transition-all duration-200 hover:scale-105 hover:shadow-card"
-                        onClick={() => quickLogin(cred.email)}
-                      >
-                        <Icon className={`h-5 w-5 ${cred.color}`} />
-                        <span className="text-xs font-medium capitalize">{t(cred.role)}</span>
-                      </Button>
-                    );
-                  })}
+                {/* Removed quick login grid, now role selection is above */}
+
+                <div className="text-center">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setShowSignUp(true)}
+                    className="flex items-center space-x-2"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    <span>Create New Account</span>
+                  </Button>
                 </div>
 
-                
+
               </CardContent>
             </Card>
           </div>

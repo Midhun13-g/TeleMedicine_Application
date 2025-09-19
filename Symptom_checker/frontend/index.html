@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Symptom Checker (Offline Ready)</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; background: #f9f9f9; }
+    textarea { width: 100%; height: 60px; font-size: 16px; padding: 10px; }
+    button { margin-top: 10px; padding: 10px 20px; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    #results { margin-top: 20px; padding: 15px; background: white; border: 1px solid #ccc; border-radius: 5px; }
+    .disease { padding: 8px; margin: 5px 0; background: #f1f1f1; border-left: 4px solid #007bff; }
+  </style>
+</head>
+<body>
+  <h1>AI Symptom Checker</h1>
+  <p>Enter symptoms separated by commas (e.g., fever, cough, headache)</p>
+
+  <textarea id="symptomInput" placeholder="Type your symptoms here..."></textarea>
+  <button onclick="checkSymptoms()">Check</button>
+
+  <div id="results"></div>
+
+  <script>
+    let localDataset = null;
+
+    // Load local dataset.json (for offline mode)
+    async function loadLocalDataset() {
+      const res = await fetch("dataset.json");
+      localDataset = await res.json();
+    }
+
+    // Match symptoms locally
+    function checkSymptomsLocal(userSymptoms) {
+      userSymptoms = userSymptoms.map(s => s.toLowerCase().replace(" ", "_"));
+      let results = [];
+
+      for (const disease in localDataset) {
+        const symptoms = localDataset[disease];
+        const overlap = userSymptoms.filter(s => symptoms.includes(s));
+        if (overlap.length > 0) {
+          const score = overlap.length / symptoms.length;
+          results.push({
+            disease: disease,
+            match_score: score,
+            matched_symptoms: overlap
+          });
+        }
+      }
+
+      results.sort((a, b) => b.match_score - a.match_score);
+      return results.slice(0, 5);
+    }
+
+    async function checkSymptoms() {
+      const input = document.getElementById("symptomInput").value
+        .split(",").map(s => s.trim()).filter(s => s.length > 0);
+
+      if (input.length === 0) {
+        document.getElementById("results").innerHTML = "<b>Please enter symptoms.</b>";
+        return;
+      }
+
+      try {
+        // Try backend first
+        const res = await fetch("http://127.0.0.1:8000/api/check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ symptoms: input })
+        });
+
+        if (!res.ok) throw new Error("Backend not available");
+
+        const data = await res.json();
+        renderResults(data.possible_conditions);
+
+      } catch (err) {
+        console.warn("Backend offline, using local dataset.", err);
+        const localResults = checkSymptomsLocal(input);
+        renderResults(localResults);
+      }
+    }
+
+    function renderResults(results) {
+      let html = "<h2>Possible Conditions:</h2>";
+      if (results.length === 0) {
+        html += "<p>No matches found.</p>";
+      } else {
+        results.forEach(r => {
+          html += `
+            <div class="disease">
+              <b>${r.disease}</b><br>
+              Match Score: ${(r.match_score * 100).toFixed(1)}%<br>
+              Matched Symptoms: ${r.matched_symptoms.join(", ")}
+            </div>
+          `;
+        });
+      }
+      document.getElementById("results").innerHTML = html;
+    }
+
+    // Load offline dataset on startup
+    loadLocalDataset();
+  </script>
+</body>
+</html>

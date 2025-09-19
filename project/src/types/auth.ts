@@ -15,6 +15,7 @@ export interface User {
 export interface AuthContext {
   user: User | null;
   login: (email: string, password: string) => Promise<boolean>;
+  register: (userData: any) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
   isAuthenticated: boolean;
 }
