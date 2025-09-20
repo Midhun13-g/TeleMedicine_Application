@@ -13,7 +13,7 @@ interface SymptomResponse {
 }
 
 class SymptomService {
-  private baseUrl = 'http://localhost:8081/api/symptoms';
+  private baseUrl = 'http://localhost:8080/api/symptoms';
   
   // Local dataset for offline functionality
   private localDataset: Record<string, string[]> = {

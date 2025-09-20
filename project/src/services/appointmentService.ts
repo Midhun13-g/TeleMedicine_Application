@@ -22,7 +22,7 @@ interface Appointment {
 }
 
 class AppointmentService {
-  private baseUrl = 'http://localhost:8081/api/appointments';
+  private baseUrl = 'http://localhost:8080/api/appointments';
 
   async getDoctors(): Promise<Doctor[]> {
     try {

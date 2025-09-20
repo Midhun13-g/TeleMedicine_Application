@@ -16,16 +16,13 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
+                .cors(cors -> cors.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/symptoms/**").permitAll()
-                        .requestMatchers("/api/appointments/**").permitAll()
-                        .requestMatchers("/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/user/**").hasAnyRole("USER", "ADMIN")
-                        .anyRequest().authenticated())
-                .formLogin(form -> form
-                        .permitAll())
-                .logout(logout -> logout.permitAll());
+                        .requestMatchers("/api/**").permitAll()
+                        .requestMatchers("/ws/**").permitAll()
+                        .anyRequest().permitAll())
+                .formLogin(form -> form.disable())
+                .httpBasic(basic -> basic.disable());
         return http.build();
     }
 

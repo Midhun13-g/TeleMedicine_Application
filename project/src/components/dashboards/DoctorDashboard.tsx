@@ -10,6 +10,10 @@ import { Calendar, Clock, User, FileText, Video, AudioLines, CheckCircle, XCircl
 import { useAuth } from '@/contexts/AuthContext';
 import { mockAppointments } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
+import { VideoCall } from '@/components/VideoCall';
+import { CallNotification } from '@/components/CallNotification';
+import { callService } from '@/services/callService';
+import { prescriptionService } from '@/services/prescriptionService';
 
 const DoctorDashboard = () => {
   const { user } = useAuth();
@@ -20,6 +24,19 @@ const DoctorDashboard = () => {
     medicines: '',
     notes: ''
   });
+  const [showVideoCall, setShowVideoCall] = useState(false);
+  const [currentCallTarget, setCurrentCallTarget] = useState<string | null>(null);
+  const [todayStats, setTodayStats] = useState({
+    consultations: 12,
+    prescriptions: 8,
+    emergencies: 2,
+    revenue: 15600
+  });
+  const [recentPatients, setRecentPatients] = useState([
+    { id: 1, name: 'Ramesh Kumar', condition: 'Hypertension', lastVisit: '2 hours ago', status: 'stable' },
+    { id: 2, name: 'Sunita Devi', condition: 'Diabetes', lastVisit: '4 hours ago', status: 'monitoring' },
+    { id: 3, name: 'Kiran Patel', condition: 'Fever', lastVisit: '1 day ago', status: 'recovered' }
+  ]);
 
   const doctorAppointments = mockAppointments.filter(apt => apt.doctorId === user?.id);
   const pendingCount = doctorAppointments.filter(apt => apt.status === 'pending').length;
@@ -40,33 +57,89 @@ const DoctorDashboard = () => {
     });
   };
 
-  const handleAddPrescription = () => {
-    if (!prescriptionForm.medicines.trim()) {
+  const handleAddPrescription = async () => {
+    if (!prescriptionForm.medicines.trim() || !prescriptionForm.patientId.trim()) {
       toast({
         title: "Error",
-        description: "Please add medicines to the prescription.",
+        description: "Please fill in patient ID and medicines.",
         variant: "destructive"
       });
       return;
     }
 
-    toast({
-      title: "Prescription Added",
-      description: "Prescription has been saved and patient has been notified.",
-    });
-
-    setPrescriptionForm({ patientId: '', medicines: '', notes: '' });
+    try {
+      const result = await prescriptionService.createPrescription({
+        patientId: parseInt(prescriptionForm.patientId),
+        doctorId: parseInt(user?.id || '1'),
+        medicines: prescriptionForm.medicines,
+        notes: prescriptionForm.notes
+      });
+      
+      if (result.success) {
+        toast({
+          title: "Prescription Added",
+          description: "Prescription has been saved and patient has been notified.",
+        });
+        setPrescriptionForm({ patientId: '', medicines: '', notes: '' });
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to create prescription",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create prescription",
+        variant: "destructive"
+      });
+    }
   };
 
-  const startVideoAudioCall = (appointmentId: string) => {
-    toast({
-      title: t('videoCallStarted'),
-      description: t('connectingToPatient'),
-    });
+  const startVideoAudioCall = async (appointmentId: string) => {
+    const appointment = doctorAppointments.find(apt => apt.id === appointmentId);
+    if (!appointment) return;
+    
+    try {
+      await callService.initiateCall(user?.id || '', appointment.patientName, 'VIDEO');
+      setCurrentCallTarget(appointment.patientName);
+      setShowVideoCall(true);
+      
+      toast({
+        title: t('videoCallStarted'),
+        description: t('connectingToPatient'),
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to start video call',
+        variant: 'destructive'
+      });
+    }
+  };
+  
+  const handleCallEnd = () => {
+    setShowVideoCall(false);
+    setCurrentCallTarget(null);
   };
 
+  if (showVideoCall) {
+    return (
+      <div className="space-y-6">
+        <CallNotification userId={user?.id || ''} />
+        <VideoCall 
+          userId={user?.id || ''} 
+          targetUserId={currentCallTarget || ''}
+          onCallEnd={handleCallEnd}
+        />
+      </div>
+    );
+  }
+  
   return (
     <div className="space-y-6">
+      <CallNotification userId={user?.id || ''} />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">{t('doctor')} {t('dashboard')}</h1>
@@ -191,29 +264,113 @@ const DoctorDashboard = () => {
             </Card>
           </div>
 
+          {/* Today's Statistics */}
+          <Card className="shadow-card bg-gradient-to-br from-card to-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                <span>Today's Performance</span>
+              </CardTitle>
+              <CardDescription>Your daily medical practice overview</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-4 bg-card rounded-xl border border-border hover:shadow-md transition-shadow group">
+                  <div className="flex items-center justify-center mb-2">
+                    <Users className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
+                  </div>
+                  <div className="text-2xl font-bold text-primary">{todayStats.consultations}</div>
+                  <div className="text-sm text-muted-foreground">Consultations</div>
+                </div>
+                <div className="text-center p-4 bg-card rounded-xl border border-border hover:shadow-md transition-shadow group">
+                  <div className="flex items-center justify-center mb-2">
+                    <FileText className="h-8 w-8 text-success group-hover:scale-110 transition-transform" />
+                  </div>
+                  <div className="text-2xl font-bold text-success">{todayStats.prescriptions}</div>
+                  <div className="text-sm text-muted-foreground">Prescriptions</div>
+                </div>
+                <div className="text-center p-4 bg-card rounded-xl border border-border hover:shadow-md transition-shadow group">
+                  <div className="flex items-center justify-center mb-2">
+                    <AlertCircle className="h-8 w-8 text-emergency group-hover:scale-110 transition-transform" />
+                  </div>
+                  <div className="text-2xl font-bold text-emergency">{todayStats.emergencies}</div>
+                  <div className="text-sm text-muted-foreground">Emergencies</div>
+                </div>
+                <div className="text-center p-4 bg-card rounded-xl border border-border hover:shadow-md transition-shadow group">
+                  <div className="flex items-center justify-center mb-2">
+                    <div className="w-8 h-8 bg-warning/20 rounded-full flex items-center justify-center">
+                      <span className="text-warning font-bold text-lg">₹</span>
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-warning">₹{todayStats.revenue.toLocaleString()}</div>
+                  <div className="text-sm text-muted-foreground">Revenue</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Recent Patients */}
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Stethoscope className="h-5 w-5 text-success" />
+                <span>Recent Patients</span>
+              </CardTitle>
+              <CardDescription>Latest patient interactions and status</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {recentPatients.map((patient) => (
+                <div key={patient.id} className="flex items-center space-x-4 p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors group">
+                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                    <User className="h-6 w-6 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-medium">{patient.name}</h4>
+                    <p className="text-sm text-muted-foreground">{patient.condition}</p>
+                    <p className="text-xs text-muted-foreground">{patient.lastVisit}</p>
+                  </div>
+                  <Badge variant={
+                    patient.status === 'stable' ? 'default' :
+                    patient.status === 'monitoring' ? 'secondary' : 'outline'
+                  } className="capitalize">
+                    {patient.status}
+                  </Badge>
+                  <Button size="sm" variant="outline" className="hover:scale-105 transition-transform">
+                    <Video className="h-4 w-4 mr-1" />
+                    Call
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
           <Card className="shadow-card">
             <CardHeader>
               <CardTitle>{t('quickActions')}</CardTitle>
               <CardDescription>Common tasks for doctors</CardDescription>
             </CardHeader>
             <CardContent className="grid md:grid-cols-4 gap-4">
-              <Button variant="medical" className="h-20 flex-col space-y-2 hover:scale-105 transition-transform">
-                <CheckCircle className="h-6 w-6" />
-                <span>{t('approve')} {t('appointments')}</span>
+              <Button variant="medical" className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-success/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <CheckCircle className="h-6 w-6 relative z-10 group-hover:animate-pulse" />
+                <span className="relative z-10">{t('approve')} {t('appointments')}</span>
               </Button>
-              <Button variant="outline" className="h-20 flex-col space-y-2 hover:scale-105 transition-transform">
-                <FileText className="h-6 w-6" />
+              <Button variant="outline" className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group">
+                <FileText className="h-6 w-6 group-hover:scale-110 transition-transform" />
                 <span>Write {t('prescriptions')}</span>
               </Button>
-              <Button variant="success" className="h-20 flex-col space-y-2 hover:scale-105 transition-transform">
+              <Button variant="success" className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group">
                 <div className="flex items-center space-x-1">
-                  <Video className="h-4 w-4" />
-                  <AudioLines className="h-4 w-4" />
+                  <Video className="h-4 w-4 group-hover:animate-pulse" />
+                  <AudioLines className="h-4 w-4 group-hover:animate-pulse" />
                 </div>
                 <span>{t('startConsultation')}</span>
               </Button>
-              <Button variant="secondary" className="h-20 flex-col space-y-2 hover:scale-105 transition-transform">
-                <MessageSquare className="h-6 w-6" />
+              <Button variant="secondary" className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group">
+                <div className="relative">
+                  <MessageSquare className="h-6 w-6 group-hover:animate-bounce" />
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-emergency rounded-full animate-pulse"></div>
+                </div>
                 <span>{t('patient')} Messages</span>
               </Button>
             </CardContent>

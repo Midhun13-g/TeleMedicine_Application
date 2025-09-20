@@ -20,15 +20,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const response = await fetch('http://localhost:8081/api/auth/login', {
+      const response = await fetch('http://localhost:8080/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({ email, password })
       });
       
+      if (!response.ok) {
+        console.error('Login failed with status:', response.status);
+        return false;
+      }
+      
       const data = await response.json();
       
-      if (data.success) {
+      if (data.success && data.user) {
         setUser(data.user);
         localStorage.setItem('user', JSON.stringify(data.user));
         return true;
@@ -42,17 +50,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const register = async (userData: any): Promise<{ success: boolean; message?: string }> => {
     try {
-      const response = await fetch('http://localhost:8081/api/auth/register', {
+      const response = await fetch('http://localhost:8080/api/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify(userData)
       });
+      
+      if (!response.ok) {
+        console.error('Registration failed with status:', response.status);
+        return { success: false, message: 'Registration failed' };
+      }
       
       const data = await response.json();
       return data;
     } catch (error) {
       console.error('Registration error:', error);
-      return { success: false, message: 'Registration failed' };
+      return { success: false, message: 'Network error. Please check if the server is running.' };
     }
   };
 

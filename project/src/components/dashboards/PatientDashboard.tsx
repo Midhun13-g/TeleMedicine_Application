@@ -13,6 +13,12 @@ import { useToast } from '@/hooks/use-toast';
 import { symptomService, type SymptomResult } from '@/services/symptomService';
 import { appointmentService, type Appointment } from '@/services/appointmentService';
 import AppointmentBooking from '@/components/AppointmentBooking';
+import { VideoCall } from '@/components/VideoCall';
+import { CallNotification } from '@/components/CallNotification';
+import { callService } from '@/services/callService';
+import { medicineService, type Medicine } from '@/services/medicineService';
+import { pharmacyService, type Pharmacy } from '@/services/pharmacyService';
+import { prescriptionService, type Prescription } from '@/services/prescriptionService';
 
 const PatientDashboard = () => {
   const { user } = useAuth();
@@ -35,16 +41,29 @@ const PatientDashboard = () => {
   const [isInstantBooking, setIsInstantBooking] = useState(false);
   const [userAppointments, setUserAppointments] = useState<Appointment[]>([]);
   const chatEndRef = useRef(null);
+  const [showVideoCall, setShowVideoCall] = useState(false);
+  const [currentCallTarget, setCurrentCallTarget] = useState<string | null>(null);
 
-  const [patientPrescriptions, setPatientPrescriptions] = useState([]);
+  const [patientPrescriptions, setPatientPrescriptions] = useState<Prescription[]>([]);
+  const [medicineResults, setMedicineResults] = useState<Medicine[]>([]);
+  const [nearbyPharmacies, setNearbyPharmacies] = useState<Pharmacy[]>([]);
+  const [isSearchingMedicine, setIsSearchingMedicine] = useState(false);
+  const [healthMetrics, setHealthMetrics] = useState({
+    heartRate: 72,
+    bloodPressure: '120/80',
+    temperature: 98.6,
+    weight: 65
+  });
+  const [upcomingReminders, setUpcomingReminders] = useState([
+    { id: 1, type: 'medicine', title: 'Take Paracetamol', time: '2:00 PM', status: 'pending' },
+    { id: 2, type: 'appointment', title: 'Dr. Sharma Consultation', time: '4:00 PM', status: 'confirmed' },
+    { id: 3, type: 'checkup', title: 'Blood Pressure Check', time: '6:00 PM', status: 'pending' }
+  ]);
 
   useEffect(() => {
     if (user?.id) {
-      // Fetch prescriptions from backend
-      fetch(`http://localhost:8081/api/prescriptions/patient/${user.id}`)
-        .then(res => res.json())
-        .then(data => setPatientPrescriptions(data))
-        .catch(() => setPatientPrescriptions([]));
+      loadPrescriptions();
+      loadNearbyPharmacies();
     }
   }, [user?.id]);
 
@@ -139,19 +158,142 @@ const PatientDashboard = () => {
     return 'Thank you for sharing your symptoms. Based on what you\'ve described, I recommend consulting with a healthcare professional for proper evaluation. Would you like me to help you schedule an appointment with one of our doctors?';
   };
 
-  // Replace with backend medicine search or remove if not implemented
-  const searchMedicine = () => {
-    toast({
-      title: t('featureUnavailable'),
-      description: 'Medicine search is not available yet.',
-      variant: 'destructive'
-    });
+  const searchMedicine = async () => {
+    if (!medicineSearch.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a medicine name to search',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    setIsSearchingMedicine(true);
+    try {
+      const results = await medicineService.searchMedicines(medicineSearch);
+      setMedicineResults(results);
+      
+      if (results.length === 0) {
+        toast({
+          title: 'No Results',
+          description: 'No medicines found with that name',
+        });
+      } else {
+        toast({
+          title: 'Search Complete',
+          description: `Found ${results.length} medicine(s)`,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Search Failed',
+        description: 'Unable to search medicines at the moment',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSearchingMedicine(false);
+    }
+  };
+  
+  const checkMedicineAvailability = async (medicineName: string) => {
+    try {
+      const availability = await medicineService.checkAvailability(medicineName);
+      toast({
+        title: availability.available ? 'Available' : 'Not Available',
+        description: availability.available 
+          ? `${medicineName} is available at ${availability.nearbyPharmacies.length} nearby pharmacies`
+          : `${medicineName} is currently not available`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Unable to check availability',
+        variant: 'destructive'
+      });
+    }
+  };
+  
+  const findNearbyPharmacies = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        const { latitude, longitude } = position.coords;
+        const pharmacies = await pharmacyService.getNearbyPharmacies(latitude, longitude);
+        setNearbyPharmacies(pharmacies);
+        
+        toast({
+          title: 'Pharmacies Found',
+          description: `Found ${pharmacies.length} nearby pharmacies`,
+        });
+      }, () => {
+        toast({
+          title: 'Location Access Denied',
+          description: 'Please enable location access to find nearby pharmacies',
+          variant: 'destructive'
+        });
+      });
+    } else {
+      toast({
+        title: 'Location Not Supported',
+        description: 'Your browser does not support location services',
+        variant: 'destructive'
+      });
+    }
+  };
+  
+  const loadPrescriptions = async () => {
+    if (user?.id) {
+      const prescriptions = await prescriptionService.getPatientPrescriptions(parseInt(user.id));
+      setPatientPrescriptions(prescriptions);
+    }
+  };
+  
+  const loadNearbyPharmacies = async () => {
+    const pharmacies = await pharmacyService.getNearbyPharmacies();
+    setNearbyPharmacies(pharmacies);
+  };
+  
+  const startVideoCall = async (doctorId: string) => {
+    try {
+      await callService.initiateCall(user?.id || '', doctorId, 'VIDEO');
+      setCurrentCallTarget(doctorId);
+      setShowVideoCall(true);
+      
+      toast({
+        title: 'Video Call Started',
+        description: 'Connecting to doctor...',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to start video call',
+        variant: 'destructive'
+      });
+    }
+  };
+  
+  const handleCallEnd = () => {
+    setShowVideoCall(false);
+    setCurrentCallTarget(null);
   };
 
 
 
+  if (showVideoCall) {
+    return (
+      <div className="space-y-6">
+        <CallNotification userId={user?.id || ''} />
+        <VideoCall 
+          userId={user?.id || ''} 
+          targetUserId={currentCallTarget || ''}
+          onCallEnd={handleCallEnd}
+        />
+      </div>
+    );
+  }
+  
   return (
     <div className="space-y-6">
+      <CallNotification userId={user?.id || ''} />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">{t('patient')} {t('dashboard')}</h1>
@@ -266,21 +408,116 @@ const PatientDashboard = () => {
                 <Calendar className="h-6 w-6" />
                 <span>{t('bookAppointment')}</span>
               </Button>
-              <Button variant="outline" className="h-20 flex-col space-y-2 hover:scale-105 transition-transform">
-                <Search className="h-6 w-6" />
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group"
+                onClick={() => setMedicineSearch('')}
+              >
+                <div className="relative">
+                  <Search className="h-6 w-6 group-hover:scale-110 transition-transform" />
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-success rounded-full animate-pulse"></div>
+                </div>
                 <span>{t('checkMedicine')}</span>
               </Button>
-              <Button variant="success" className="h-20 flex-col space-y-2 hover:scale-105 transition-transform">
-                <div className="flex items-center space-x-1">
-                  <Video className="h-4 w-4" />
-                  <AudioLines className="h-4 w-4" />
+              <Button 
+                variant="success" 
+                className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group relative overflow-hidden"
+                onClick={() => toast({ title: 'Video Call', description: 'Connecting to available doctors...' })}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-success/20 to-primary/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className="flex items-center space-x-1 relative z-10">
+                  <Video className="h-4 w-4 group-hover:animate-pulse" />
+                  <AudioLines className="h-4 w-4 group-hover:animate-pulse" />
                 </div>
-                <span>{t('videoAudioCall')}</span>
+                <span className="relative z-10">{t('videoAudioCall')}</span>
               </Button>
-              <Button variant="secondary" className="h-20 flex-col space-y-2 hover:scale-105 transition-transform">
-                <MapPin className="h-6 w-6" />
+              <Button 
+                variant="secondary" 
+                className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group"
+                onClick={findNearbyPharmacies}
+              >
+                <div className="relative">
+                  <MapPin className="h-6 w-6 group-hover:animate-bounce" />
+                  <div className="absolute inset-0 bg-warning/20 rounded-full animate-ping opacity-0 group-hover:opacity-100"></div>
+                </div>
                 <span>{t('findPharmacy')}</span>
               </Button>
+            </CardContent>
+          </Card>
+
+          {/* Health Metrics */}
+          <Card className="shadow-card bg-gradient-to-br from-card to-accent/5">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Activity className="h-5 w-5 text-primary" />
+                <span>Health Metrics</span>
+              </CardTitle>
+              <CardDescription>Your vital signs and health indicators</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-4 bg-card rounded-xl border border-border hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-center mb-2">
+                    <Heart className="h-8 w-8 text-emergency animate-pulse" />
+                  </div>
+                  <div className="text-2xl font-bold text-emergency">{healthMetrics.heartRate}</div>
+                  <div className="text-sm text-muted-foreground">BPM</div>
+                </div>
+                <div className="text-center p-4 bg-card rounded-xl border border-border hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-center mb-2">
+                    <Activity className="h-8 w-8 text-primary" />
+                  </div>
+                  <div className="text-2xl font-bold text-primary">{healthMetrics.bloodPressure}</div>
+                  <div className="text-sm text-muted-foreground">mmHg</div>
+                </div>
+                <div className="text-center p-4 bg-card rounded-xl border border-border hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-center mb-2">
+                    <div className="w-8 h-8 bg-warning/20 rounded-full flex items-center justify-center">
+                      <div className="w-4 h-4 bg-warning rounded-full"></div>
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-warning">{healthMetrics.temperature}°F</div>
+                  <div className="text-sm text-muted-foreground">Temperature</div>
+                </div>
+                <div className="text-center p-4 bg-card rounded-xl border border-border hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-center mb-2">
+                    <div className="w-8 h-8 bg-success/20 rounded-full flex items-center justify-center">
+                      <div className="w-4 h-4 bg-success rounded-full"></div>
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-success">{healthMetrics.weight} kg</div>
+                  <div className="text-sm text-muted-foreground">Weight</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Health Reminders */}
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Clock className="h-5 w-5 text-warning" />
+                <span>Today's Reminders</span>
+              </CardTitle>
+              <CardDescription>Don't miss your health schedule</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {upcomingReminders.map((reminder) => (
+                <div key={reminder.id} className="flex items-center space-x-3 p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
+                  <div className={`w-3 h-3 rounded-full ${
+                    reminder.type === 'medicine' ? 'bg-success animate-pulse' :
+                    reminder.type === 'appointment' ? 'bg-primary animate-pulse' :
+                    'bg-warning animate-pulse'
+                  }`}></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{reminder.title}</p>
+                    <p className="text-xs text-muted-foreground">{reminder.time}</p>
+                  </div>
+                  <Badge variant={reminder.status === 'confirmed' ? 'default' : 'secondary'} className="text-xs">
+                    {reminder.status}
+                  </Badge>
+                </div>
+              ))}
             </CardContent>
           </Card>
 
@@ -485,7 +722,12 @@ const PatientDashboard = () => {
                     </div>
                   )}
                   {appointment.status === 'approved' && (
-                    <Button size="sm" variant="success" className="mt-2">
+                    <Button 
+                      size="sm" 
+                      variant="success" 
+                      className="mt-2"
+                      onClick={() => startVideoCall(appointment.doctorName)}
+                    >
                       <div className="flex items-center space-x-1 mr-1">
                         <Video className="h-3 w-3" />
                         <AudioLines className="h-3 w-3" />
@@ -513,12 +755,52 @@ const PatientDashboard = () => {
                   onChange={(e) => setMedicineSearch(e.target.value)}
                   className="flex-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
                 />
-                <Button onClick={searchMedicine} variant="medical" className="hover:scale-105 transition-transform">
+                <Button 
+                  onClick={searchMedicine} 
+                  variant="medical" 
+                  className="hover:scale-105 transition-transform"
+                  disabled={isSearchingMedicine}
+                >
                   <Search className="h-4 w-4" />
-                  {t('search')}
+                  {isSearchingMedicine ? 'Searching...' : t('search')}
                 </Button>
               </div>
 
+              {/* Medicine Search Results */}
+              {medicineResults.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-2">Search Results</h4>
+                  <div className="space-y-2">
+                    {medicineResults.map((medicine) => (
+                      <div key={medicine.id} className="border rounded-lg p-3 hover:shadow-md transition-shadow">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h5 className="font-medium">{medicine.name}</h5>
+                            <p className="text-sm text-muted-foreground">{medicine.manufacturer} • {medicine.category}</p>
+                            <p className="text-sm">{medicine.description}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium">₹{medicine.price}</p>
+                            <Badge variant={medicine.available ? 'default' : 'secondary'}>
+                              {medicine.available ? 'Available' : 'Out of Stock'}
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => checkMedicineAvailability(medicine.name)}
+                          >
+                            Check Availability
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
               {/* Popular medicines */}
               <div>
                 <h4 className="font-medium mb-2">{t('popularMedicines')}</h4>
@@ -536,6 +818,39 @@ const PatientDashboard = () => {
                   ))}
                 </div>
               </div>
+              
+              {/* Nearby Pharmacies */}
+              {nearbyPharmacies.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-2">Nearby Pharmacies</h4>
+                  <div className="space-y-2">
+                    {nearbyPharmacies.map((pharmacy) => (
+                      <div key={pharmacy.id} className="border rounded-lg p-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h5 className="font-medium">{pharmacy.name}</h5>
+                            <p className="text-sm text-muted-foreground">{pharmacy.address}</p>
+                            <p className="text-sm">{pharmacy.openHours}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium">{pharmacy.distance}</p>
+                            <div className="flex items-center">
+                              {[...Array(5)].map((_, i) => (
+                                <Star key={i} className={`h-3 w-3 ${i < pharmacy.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
+                              ))}
+                            </div>
+                            {pharmacy.is24Hours && <Badge variant="outline" className="text-xs">24 Hours</Badge>}
+                          </div>
+                        </div>
+                        <Button size="sm" variant="outline" className="mt-2">
+                          <MapPin className="h-3 w-3 mr-1" />
+                          Get Directions
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -545,51 +860,51 @@ const PatientDashboard = () => {
               <CardDescription>Active prescriptions from doctors</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {patientPrescriptions.map((prescription) => (
-                <div key={prescription.id} className="border border-border rounded-lg p-4 space-y-3 hover:shadow-card transition-shadow duration-200">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <User className="h-4 w-4 text-primary" />
-                      <span className="font-medium">{prescription.doctorName}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant={prescription.status === 'active' ? 'default' : 'secondary'}>
-                        {t(prescription.status)}
-                      </Badge>
-                      <Badge variant="outline">{prescription.date}</Badge>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    {prescription.medicines.map((medicine) => (
-                      <div key={medicine.id} className="flex items-center space-x-2 text-sm p-2 bg-muted/30 rounded">
-                        <Pill className="h-3 w-3 text-success" />
-                        <span className="font-medium">{medicine.name}</span>
-                        <span className="text-muted-foreground">
-                          {medicine.dosage} - {medicine.frequency} for {medicine.duration}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {prescription.notes && (
-                    <p className="text-sm text-muted-foreground bg-muted p-2 rounded">
-                      {t('notes')}: {prescription.notes}
-                    </p>
-                  )}
-
-                  <div className="flex space-x-2 pt-2">
-                    <Button size="sm" variant="outline">
-                      <MapPin className="h-3 w-3 mr-1" />
-                      {t('findPharmacy')}
-                    </Button>
-                    <Button size="sm" variant="success">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      {t('markAsTaken')}
-                    </Button>
-                  </div>
+              {patientPrescriptions.length === 0 ? (
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">No prescriptions found</p>
                 </div>
-              ))}
+              ) : (
+                patientPrescriptions.map((prescription) => (
+                  <div key={prescription.id} className="border border-border rounded-lg p-4 space-y-3 hover:shadow-card transition-shadow duration-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <User className="h-4 w-4 text-primary" />
+                        <span className="font-medium">{prescription.doctorName}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant={prescription.status === 'active' ? 'default' : 'secondary'}>
+                          {prescription.status}
+                        </Badge>
+                        <Badge variant="outline">{new Date(prescription.date).toLocaleDateString()}</Badge>
+                      </div>
+                    </div>
+
+                    <div className="bg-muted/30 p-3 rounded">
+                      <h5 className="font-medium mb-2">Medicines:</h5>
+                      <p className="text-sm whitespace-pre-wrap">{prescription.medicines}</p>
+                    </div>
+
+                    {prescription.notes && (
+                      <p className="text-sm text-muted-foreground bg-muted p-2 rounded">
+                        <strong>Notes:</strong> {prescription.notes}
+                      </p>
+                    )}
+
+                    <div className="flex space-x-2 pt-2">
+                      <Button size="sm" variant="outline" onClick={findNearbyPharmacies}>
+                        <MapPin className="h-3 w-3 mr-1" />
+                        Find Pharmacy
+                      </Button>
+                      <Button size="sm" variant="success">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Mark as Taken
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Activity, Heart, Users, Building2, ArrowLeft } from 'lucide-react';
+import { Activity, Heart, Users, Building2, ArrowLeft, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface SignUpPageProps {
@@ -36,6 +36,25 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onBackToLogin }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validation
+    if (!formData.name || !formData.email || !formData.password || !formData.role) {
+      toast({
+        title: "Missing Fields",
+        description: "Please fill in all required fields",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (formData.password.length < 6) {
+      toast({
+        title: "Password Too Short",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive"
+      });
+      return;
+    }
     
     if (formData.password !== formData.confirmPassword) {
       toast({
@@ -85,42 +104,55 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onBackToLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-medical">
-        <CardHeader className="text-center">
-          <div className="flex items-center justify-center space-x-2 mb-4">
-            <Activity className="h-8 w-8 text-primary" />
-            <h1 className="text-xl font-bold">TeleAsha</h1>
+    <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Floating background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-10 left-10 w-20 h-20 bg-primary/5 rounded-full floating-element"></div>
+        <div className="absolute top-1/3 right-10 w-16 h-16 bg-accent/5 rounded-full floating-element" style={{animationDelay: '1s'}}></div>
+        <div className="absolute bottom-20 left-1/3 w-24 h-24 bg-success/5 rounded-full floating-element" style={{animationDelay: '2s'}}></div>
+      </div>
+      
+      <Card className="w-full max-w-2xl shadow-medical border-0 bg-card/90 backdrop-blur-sm relative z-10 animate-slide-up">
+        <CardHeader className="text-center pb-8">
+          <div className="flex items-center justify-center space-x-3 mb-6">
+            <div className="relative">
+              <Activity className="h-10 w-10 text-primary animate-pulse" />
+              <div className="absolute inset-0 h-10 w-10 bg-primary/20 rounded-full animate-ping"></div>
+            </div>
+            <h1 className="text-2xl font-bold gradient-text">TeleAsha</h1>
           </div>
-          <CardTitle className="text-2xl">Create Account</CardTitle>
-          <CardDescription>Join our healthcare community</CardDescription>
+          <CardTitle className="text-3xl font-bold gradient-text">Create Account</CardTitle>
+          <CardDescription className="text-lg text-muted-foreground mt-2">Join our healthcare community and get started</CardDescription>
         </CardHeader>
         
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+        <CardContent className="px-8 pb-8">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
                 placeholder="Full Name"
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 required
+                className="h-12 px-4 text-lg border-2 border-border/50 focus:border-primary/50 rounded-xl transition-all duration-300 bg-background/50"
               />
               <Input
                 type="email"
-                placeholder="Email"
+                placeholder="Email Address"
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
                 required
+                className="h-12 px-4 text-lg border-2 border-border/50 focus:border-primary/50 rounded-xl transition-all duration-300 bg-background/50"
               />
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
                 type="password"
                 placeholder="Password"
                 value={formData.password}
                 onChange={(e) => handleInputChange('password', e.target.value)}
                 required
+                className="h-12 px-4 text-lg border-2 border-border/50 focus:border-primary/50 rounded-xl transition-all duration-300 bg-background/50"
               />
               <Input
                 type="password"
@@ -128,12 +160,13 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onBackToLogin }) => {
                 value={formData.confirmPassword}
                 onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
                 required
+                className="h-12 px-4 text-lg border-2 border-border/50 focus:border-primary/50 rounded-xl transition-all duration-300 bg-background/50"
               />
             </div>
             
             <Select onValueChange={(value) => handleInputChange('role', value)} required>
-              <SelectTrigger>
-                <SelectValue placeholder="Select Role" />
+              <SelectTrigger className="h-12 px-4 text-lg border-2 border-border/50 focus:border-primary/50 rounded-xl transition-all duration-300 bg-background/50">
+                <SelectValue placeholder="Select Your Role" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="patient">
@@ -202,21 +235,39 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onBackToLogin }) => {
             
             <Button 
               type="submit" 
-              variant="medical" 
-              className="w-full" 
+              className="w-full h-12 text-lg font-semibold bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-lg" 
               disabled={loading}
             >
-              {loading ? 'Creating Account...' : 'Create Account'}
+              {loading ? (
+                <div className="flex items-center space-x-2">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <span>Creating Account...</span>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <UserPlus className="h-5 w-5" />
+                  <span>Create Account</span>
+                </div>
+              )}
             </Button>
           </form>
           
-          <div className="mt-4 text-center">
+          <div className="mt-6 text-center space-y-4">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border/50" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="bg-card px-4 text-muted-foreground">Already have an account?</span>
+              </div>
+            </div>
+            
             <Button 
-              variant="ghost" 
+              variant="outline" 
               onClick={onBackToLogin}
-              className="flex items-center space-x-2"
+              className="w-full h-12 text-lg font-medium border-2 border-primary/20 hover:border-primary/50 hover:bg-primary/5 rounded-xl transition-all duration-300 hover:scale-105"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-5 w-5 mr-2" />
               <span>Back to Login</span>
             </Button>
           </div>
