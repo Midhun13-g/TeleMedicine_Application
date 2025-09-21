@@ -10,6 +10,9 @@ export interface User {
   specialization?: string; // for doctors
   location?: string; // for patients and pharmacies
   phone?: string;
+  address?: string;
+  licenseNumber?: string;
+  pharmacyName?: string;
 }
 
 export interface AuthContext {
@@ -17,5 +20,6 @@ export interface AuthContext {
   login: (email: string, password: string) => Promise<boolean>;
   register: (userData: any) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
+  updateProfile: (userId: string, profileData: any) => Promise<{ success: boolean; message?: string }>;
   isAuthenticated: boolean;
 }

@@ -27,6 +27,7 @@ public class DataInitializer implements CommandLineRunner {
         // Sample Doctors
         if (!userService.existsByEmail("dr.sharma@teleasha.com")) {
             User doctor1 = new User("dr.sharma@teleasha.com", "password123", "Dr. Rajesh Sharma", User.Role.DOCTOR);
+            System.out.println("Creating doctor: dr.sharma@teleasha.com");
             doctor1.setPhone("+91-9876543210");
             doctor1.setAddress("Apollo Hospital, Ahmedabad, Gujarat");
             doctor1.setSpecialization("Cardiology");
@@ -64,6 +65,7 @@ public class DataInitializer implements CommandLineRunner {
         // Sample Patients
         if (!userService.existsByEmail("patient1@teleasha.com")) {
             User patient1 = new User("patient1@teleasha.com", "password123", "Ramesh Kumar", User.Role.PATIENT);
+            System.out.println("Creating patient: patient1@teleasha.com");
             patient1.setPhone("+91-9876543220");
             patient1.setAddress("Village Kheda, Anand District, Gujarat");
             userService.save(patient1);

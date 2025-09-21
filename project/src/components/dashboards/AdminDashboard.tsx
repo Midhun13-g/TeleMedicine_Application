@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,9 +10,71 @@ import { useAuth } from '@/contexts/AuthContext';
 import { demoUsers, mockAnalytics } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
 
+interface SystemUser {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  phone?: string;
+  address?: string;
+  specialization?: string;
+  pharmacyName?: string;
+  createdAt: string;
+}
+
+interface SystemStats {
+  totalUsers: number;
+  totalPatients: number;
+  totalDoctors: number;
+  totalPharmacies: number;
+  totalAdmins: number;
+}
+
 const AdminDashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
+  const [systemStats, setSystemStats] = useState<SystemStats>({
+    totalUsers: 0,
+    totalPatients: 0,
+    totalDoctors: 0,
+    totalPharmacies: 0,
+    totalAdmins: 0
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadSystemData();
+  }, []);
+
+  const loadSystemData = async () => {
+    try {
+      setLoading(true);
+      
+      // Load all users
+      const usersResponse = await fetch('http://localhost:8080/api/admin/users');
+      if (usersResponse.ok) {
+        const users = await usersResponse.json();
+        setSystemUsers(users);
+      }
+      
+      // Load system stats
+      const statsResponse = await fetch('http://localhost:8080/api/admin/stats');
+      if (statsResponse.ok) {
+        const stats = await statsResponse.json();
+        setSystemStats(stats);
+      }
+    } catch (error) {
+      console.error('Error loading system data:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load system data',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const exportCSV = () => {
     toast({
@@ -54,7 +116,7 @@ const AdminDashboard = () => {
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-success">{mockAnalytics.activePatients}</div>
+                <div className="text-2xl font-bold text-success">{systemStats.totalPatients}</div>
                 <p className="text-xs text-muted-foreground">+8% from last month</p>
               </CardContent>
             </Card>
@@ -65,7 +127,7 @@ const AdminDashboard = () => {
                 <UserCheck className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-primary">{mockAnalytics.activeDoctors}</div>
+                <div className="text-2xl font-bold text-primary">{systemStats.totalDoctors}</div>
                 <p className="text-xs text-muted-foreground">+3 new this month</p>
               </CardContent>
             </Card>
@@ -76,7 +138,7 @@ const AdminDashboard = () => {
                 <Building2 className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-warning">{mockAnalytics.totalPharmacies}</div>
+                <div className="text-2xl font-bold text-warning">{systemStats.totalPharmacies}</div>
                 <p className="text-xs text-muted-foreground">2 pending approval</p>
               </CardContent>
             </Card>
@@ -183,25 +245,35 @@ const AdminDashboard = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {demoUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.name}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>
-                        <Badge variant={
-                          user.role === 'doctor' ? 'default' :
-                          user.role === 'patient' ? 'secondary' :
-                          user.role === 'pharmacy' ? 'outline' : 'destructive'
-                        }>
-                          {user.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{user.location}</TableCell>
-                      <TableCell>
-                        <Badge variant="default">Active</Badge>
-                      </TableCell>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center">Loading users...</TableCell>
                     </TableRow>
-                  ))}
+                  ) : systemUsers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center">No users found</TableCell>
+                    </TableRow>
+                  ) : (
+                    systemUsers.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">{user.name}</TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            user.role.toLowerCase() === 'doctor' ? 'default' :
+                            user.role.toLowerCase() === 'patient' ? 'secondary' :
+                            user.role.toLowerCase() === 'pharmacy' ? 'outline' : 'destructive'
+                          }>
+                            {user.role.toLowerCase()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{user.address || user.specialization || user.pharmacyName || 'N/A'}</TableCell>
+                        <TableCell>
+                          <Badge variant="default">Active</Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

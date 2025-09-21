@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.stream.Collectors;
+import java.time.LocalDateTime;
+import com.example.projectbackend.repository.PrescriptionRepository;
 
 @RestController
 @RequestMapping("/api/prescriptions")
@@ -23,19 +25,31 @@ public class PrescriptionController {
     @Autowired
     private UserService userService;
     
+    @Autowired
+    private PrescriptionRepository prescriptionRepository;
+    
     @PostMapping("/create")
     public ResponseEntity<Map<String, Object>> createPrescription(@RequestBody Map<String, Object> request) {
         try {
+            System.out.println("Creating prescription with data: " + request);
+            
             Long patientId = Long.valueOf(request.get("patientId").toString());
             Long doctorId = Long.valueOf(request.get("doctorId").toString());
             String medicines = (String) request.get("medicines");
             String notes = (String) request.get("notes");
             
+            System.out.println("Patient ID: " + patientId + ", Doctor ID: " + doctorId);
+            
             User patient = userService.findById(patientId);
             User doctor = userService.findById(doctorId);
             
-            if (patient == null || doctor == null) {
-                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid patient or doctor"));
+            if (patient == null) {
+                System.out.println("Patient not found with ID: " + patientId);
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Patient not found"));
+            }
+            if (doctor == null) {
+                System.out.println("Doctor not found with ID: " + doctorId);
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Doctor not found"));
             }
             
             Prescription prescription = new Prescription();
@@ -45,9 +59,12 @@ public class PrescriptionController {
             prescription.setNotes(notes);
             
             Prescription saved = prescriptionService.save(prescription);
+            System.out.println("Prescription saved with ID: " + saved.getId());
             
             return ResponseEntity.ok(Map.of("success", true, "prescriptionId", saved.getId()));
         } catch (Exception e) {
+            System.out.println("Error creating prescription: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
         }
     }
@@ -68,9 +85,127 @@ public class PrescriptionController {
             map.put("notes", p.getNotes());
             map.put("status", p.getStatus().toString().toLowerCase());
             map.put("date", p.getCreatedAt().toString());
+            if (p.getTakenAt() != null) {
+                map.put("takenAt", p.getTakenAt().toString());
+            }
             return map;
         }).collect(Collectors.toList());
         
         return ResponseEntity.ok(result);
+    }
+    
+    @PostMapping("/{prescriptionId}/mark-taken")
+    public ResponseEntity<Map<String, Object>> markAsTaken(@PathVariable Long prescriptionId) {
+        try {
+            Prescription prescription = prescriptionRepository.findById(prescriptionId).orElse(null);
+            if (prescription == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Prescription not found"
+                ));
+            }
+            
+            prescription.setStatus(Prescription.Status.TAKEN);
+            prescription.setTakenAt(LocalDateTime.now());
+            Prescription saved = prescriptionRepository.save(prescription);
+            
+            System.out.println("✅ Prescription " + prescriptionId + " marked as taken by patient " + prescription.getPatient().getName());
+            System.out.println("  - Status after save: " + saved.getStatus());
+            System.out.println("  - TakenAt after save: " + saved.getTakenAt());
+            System.out.println("  - Doctor ID: " + saved.getDoctor().getId());
+            
+            // Notify doctor via call server
+            try {
+                Map<String, Object> notification = Map.of(
+                    "patientId", prescription.getPatient().getId().toString(),
+                    "patientName", prescription.getPatient().getName(),
+                    "doctorId", prescription.getDoctor().getId().toString(),
+                    "prescriptionId", prescriptionId.toString(),
+                    "takenAt", prescription.getTakenAt().toString()
+                );
+                
+                // Send to call server
+                java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+                java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                    .uri(java.net.URI.create("http://localhost:5002/api/medicine/taken"))
+                    .header("Content-Type", "application/json")
+                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(
+                        new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(notification)
+                    ))
+                    .build();
+                    
+                client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+                System.out.println("📡 Notified doctor about medicine taken");
+            } catch (Exception e) {
+                System.err.println("Failed to notify doctor: " + e.getMessage());
+            }
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Prescription marked as taken",
+                "takenAt", saved.getTakenAt().toString(),
+                "prescriptionId", saved.getId(),
+                "doctorId", saved.getDoctor().getId()
+            ));
+        } catch (Exception e) {
+            System.err.println("Error marking prescription as taken: " + e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", "Failed to mark prescription as taken: " + e.getMessage()
+            ));
+        }
+    }
+    
+    @GetMapping("/taken-notifications/{doctorId}")
+    public ResponseEntity<List<Map<String, Object>>> getTakenNotifications(@PathVariable Long doctorId) {
+        try {
+            System.out.println("🔍 Checking taken notifications for doctor ID: " + doctorId);
+            
+            List<Prescription> allPrescriptions = prescriptionRepository.findAll();
+            System.out.println("📋 Total prescriptions in database: " + allPrescriptions.size());
+            
+            allPrescriptions.forEach(p -> {
+                System.out.println("  - Prescription ID: " + p.getId() + 
+                                 ", Doctor ID: " + p.getDoctor().getId() + 
+                                 ", Status: " + p.getStatus() + 
+                                 ", TakenAt: " + p.getTakenAt());
+            });
+            
+            List<Prescription> takenPrescriptions = allPrescriptions.stream()
+                .filter(p -> p.getDoctor().getId().equals(doctorId) && 
+                           p.getStatus() == Prescription.Status.TAKEN &&
+                           p.getTakenAt() != null)
+                .collect(Collectors.toList());
+            
+            System.out.println("💊 Found " + takenPrescriptions.size() + " taken prescriptions for doctor " + doctorId);
+            
+            List<Map<String, Object>> notifications = takenPrescriptions.stream().map(p -> Map.of(
+                "prescriptionId", p.getId(),
+                "patientName", p.getPatient().getName(),
+                "patientId", p.getPatient().getId(),
+                "takenAt", p.getTakenAt().toString(),
+                "medicines", p.getMedicines()
+            )).collect(Collectors.toList());
+            
+            return ResponseEntity.ok(notifications);
+        } catch (Exception e) {
+            System.err.println("❌ Error in getTakenNotifications: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().build();
+        }
+    }
+    
+    @GetMapping("/debug/users")
+    public ResponseEntity<Map<String, Object>> debugUsers() {
+        List<User> allUsers = userService.getAllUsers();
+        Map<String, Object> debug = new HashMap<>();
+        debug.put("totalUsers", allUsers.size());
+        debug.put("users", allUsers.stream().map(u -> Map.of(
+            "id", u.getId(),
+            "name", u.getName(),
+            "email", u.getEmail(),
+            "role", u.getRole().toString()
+        )).collect(Collectors.toList()));
+        return ResponseEntity.ok(debug);
     }
 }

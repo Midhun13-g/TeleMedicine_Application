@@ -28,6 +28,7 @@ public class User {
     private String specialization;
     private String licenseNumber;
     private String pharmacyName;
+    private String experience;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     
@@ -77,6 +78,9 @@ public class User {
     
     public String getPharmacyName() { return pharmacyName; }
     public void setPharmacyName(String pharmacyName) { this.pharmacyName = pharmacyName; }
+    
+    public String getExperience() { return experience; }
+    public void setExperience(String experience) { this.experience = experience; }
     
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

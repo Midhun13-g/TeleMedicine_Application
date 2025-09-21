@@ -55,4 +55,45 @@ public class CallController {
         List<Call> calls = callService.getIncomingCalls(userId);
         return ResponseEntity.ok(calls);
     }
+    
+    @PostMapping("/doctor/online")
+    public ResponseEntity<Map<String, String>> setDoctorOnline(@RequestBody Map<String, Object> request) {
+        String doctorId = (String) request.get("doctorId");
+        callService.setDoctorOnline(doctorId, true);
+        return ResponseEntity.ok(Map.of("message", "Doctor status updated to online"));
+    }
+    
+    @PostMapping("/doctor/offline")
+    public ResponseEntity<Map<String, String>> setDoctorOffline(@RequestBody Map<String, Object> request) {
+        String doctorId = (String) request.get("doctorId");
+        callService.setDoctorOnline(doctorId, false);
+        return ResponseEntity.ok(Map.of("message", "Doctor status updated to offline"));
+    }
+    
+    @GetMapping("/doctors/available")
+    public ResponseEntity<List<String>> getAvailableDoctors() {
+        List<String> doctors = callService.getAvailableDoctors();
+        return ResponseEntity.ok(doctors);
+    }
+    
+    @PostMapping("/consultation/request")
+    public ResponseEntity<Map<String, Object>> requestConsultation(@RequestBody Map<String, Object> request) {
+        String patientId = (String) request.get("patientId");
+        String doctorId = (String) request.get("doctorId");
+        String consultationId = callService.requestConsultation(patientId, doctorId);
+        return ResponseEntity.ok(Map.of("consultationId", consultationId, "status", "requested"));
+    }
+    
+    @PostMapping("/consultation/{consultationId}/accept")
+    public ResponseEntity<Map<String, Object>> acceptConsultation(@PathVariable String consultationId) {
+        String roomId = callService.acceptConsultation(consultationId);
+        return ResponseEntity.ok(Map.of("consultationId", consultationId, "roomId", roomId, "status", "accepted"));
+    }
+    
+    @PostMapping("/consultation/{consultationId}/reject")
+    public ResponseEntity<Map<String, String>> rejectConsultation(@PathVariable String consultationId, @RequestBody Map<String, String> request) {
+        String reason = request.getOrDefault("reason", "Doctor unavailable");
+        callService.rejectConsultation(consultationId, reason);
+        return ResponseEntity.ok(Map.of("consultationId", consultationId, "status", "rejected", "reason", reason));
+    }
 }

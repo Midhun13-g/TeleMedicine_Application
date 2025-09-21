@@ -35,8 +35,10 @@ public class Prescription {
     @Enumerated(EnumType.STRING)
     private Status status = Status.ACTIVE;
     
+    private LocalDateTime takenAt;
+    
     public enum Status {
-        ACTIVE, COMPLETED, CANCELLED
+        ACTIVE, TAKEN, COMPLETED, CANCELLED
     }
     
     @PrePersist

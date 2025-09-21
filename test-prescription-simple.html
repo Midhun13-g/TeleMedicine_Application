@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Prescription Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        button { padding: 10px; margin: 5px; }
+        .result { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        .success { background-color: #d4edda; }
+        .error { background-color: #f8d7da; }
+    </style>
+</head>
+<body>
+    <h1>Prescription Test</h1>
+    
+    <button onclick="testCreatePrescription()">Create Test Prescription</button>
+    <button onclick="testGetPrescriptions()">Get Patient Prescriptions</button>
+    <button onclick="clearResults()">Clear Results</button>
+    
+    <div id="results"></div>
+
+    <script>
+        function addResult(message, isError = false) {
+            const div = document.createElement('div');
+            div.className = 'result ' + (isError ? 'error' : 'success');
+            div.innerHTML = '<strong>' + new Date().toLocaleTimeString() + ':</strong> ' + message;
+            document.getElementById('results').appendChild(div);
+        }
+
+        async function testCreatePrescription() {
+            try {
+                addResult('Creating prescription for Patient ID 1...');
+                
+                const response = await fetch('http://localhost:8080/api/prescriptions/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        patientId: 1,
+                        doctorId: 1,
+                        medicines: 'Paracetamol 500mg - Take twice daily for 5 days\nRest and drink plenty of water',
+                        notes: 'Take after meals. Contact doctor if symptoms persist after 3 days.'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    addResult('✅ Prescription created successfully! ID: ' + result.prescriptionId);
+                } else {
+                    addResult('❌ Failed to create prescription: ' + (result.message || 'Unknown error'), true);
+                }
+            } catch (error) {
+                addResult('❌ Network error: ' + error.message, true);
+            }
+        }
+        
+        async function testGetPrescriptions() {
+            try {
+                addResult('Fetching prescriptions for Patient ID 1...');
+                
+                const response = await fetch('http://localhost:8080/api/prescriptions/patient/1');
+                const result = await response.json();
+                
+                if (response.ok) {
+                    addResult('✅ Found ' + result.length + ' prescriptions');
+                    result.forEach((prescription, index) => {
+                        addResult(`Prescription ${index + 1}: Dr. ${prescription.doctorName} - ${prescription.medicines.substring(0, 50)}...`);
+                    });
+                } else {
+                    addResult('❌ Failed to fetch prescriptions', true);
+                }
+            } catch (error) {
+                addResult('❌ Network error: ' + error.message, true);
+            }
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+    </script>
+</body>
+</html>

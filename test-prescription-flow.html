@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Complete Prescription Flow</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { display: flex; gap: 20px; }
+        .panel { border: 1px solid #ccc; padding: 15px; width: 45%; }
+        button { padding: 8px 12px; margin: 5px; }
+        .log { background: #f5f5f5; padding: 10px; height: 200px; overflow-y: auto; font-size: 12px; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>Complete Prescription Flow Test</h1>
+    
+    <div class="container">
+        <div class="panel">
+            <h3>Doctor Actions</h3>
+            <button onclick="connectDoctor()">Connect as Doctor</button>
+            <button onclick="createPrescription()">Create Prescription</button>
+            <div id="doctorLog" class="log"></div>
+        </div>
+        
+        <div class="panel">
+            <h3>Patient Actions</h3>
+            <button onclick="connectPatient()">Connect as Patient</button>
+            <button onclick="getPrescriptions()">Get Prescriptions</button>
+            <div id="patientLog" class="log"></div>
+        </div>
+    </div>
+    
+    <div style="margin-top: 20px;">
+        <button onclick="clearLogs()">Clear Logs</button>
+        <button onclick="testFullFlow()">Test Full Flow</button>
+    </div>
+
+    <script>
+        let doctorSocket = null;
+        let patientSocket = null;
+        
+        function logDoctor(message, type = 'info') {
+            const log = document.getElementById('doctorLog');
+            const div = document.createElement('div');
+            div.className = type;
+            div.innerHTML = new Date().toLocaleTimeString() + ': ' + message;
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function logPatient(message, type = 'info') {
+            const log = document.getElementById('patientLog');
+            const div = document.createElement('div');
+            div.className = type;
+            div.innerHTML = new Date().toLocaleTimeString() + ': ' + message;
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function connectDoctor() {
+            if (doctorSocket) {
+                doctorSocket.disconnect();
+            }
+            
+            doctorSocket = io('http://localhost:5002');
+            
+            doctorSocket.on('connect', () => {
+                logDoctor('✅ Doctor connected to call server', 'success');
+                doctorSocket.emit('doctor_online', {
+                    doctorId: '1',
+                    doctorInfo: { name: 'Test Doctor', specialization: 'General Medicine' }
+                });
+            });
+            
+            doctorSocket.on('disconnect', () => {
+                logDoctor('❌ Doctor disconnected', 'error');
+            });
+        }
+        
+        function connectPatient() {
+            if (patientSocket) {
+                patientSocket.disconnect();
+            }
+            
+            patientSocket = io('http://localhost:5002');
+            
+            patientSocket.on('connect', () => {
+                logPatient('✅ Patient connected to call server', 'success');
+                patientSocket.emit('patient_subscribe', { patientId: '1' });
+            });
+            
+            patientSocket.on('prescription_added', (data) => {
+                logPatient('🆕 Prescription notification received: ' + JSON.stringify(data), 'success');
+            });
+            
+            patientSocket.on('disconnect', () => {
+                logPatient('❌ Patient disconnected', 'error');
+            });
+        }
+        
+        async function createPrescription() {
+            try {
+                logDoctor('📝 Creating prescription...');
+                
+                const response = await fetch('http://localhost:8080/api/prescriptions/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        patientId: 1,
+                        doctorId: 1,
+                        medicines: 'Test Medicine 500mg - Take twice daily',
+                        notes: 'Test prescription from flow test'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    logDoctor('✅ Prescription created: ID ' + result.prescriptionId, 'success');
+                    
+                    // Send socket notification
+                    if (doctorSocket && doctorSocket.connected) {
+                        const notificationData = {
+                            patientId: '1',
+                            doctorName: 'Test Doctor',
+                            medicines: 'Test Medicine 500mg - Take twice daily',
+                            notes: 'Test prescription from flow test',
+                            prescriptionId: result.prescriptionId
+                        };
+                        
+                        doctorSocket.emit('prescription_added', notificationData);
+                        logDoctor('📡 Sent prescription notification via socket', 'info');
+                    }
+                } else {
+                    logDoctor('❌ Failed to create prescription: ' + (result.message || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                logDoctor('❌ Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function getPrescriptions() {
+            try {
+                logPatient('📋 Fetching prescriptions...');
+                
+                const response = await fetch('http://localhost:8080/api/prescriptions/patient/1');
+                const result = await response.json();
+                
+                if (response.ok) {
+                    logPatient('✅ Found ' + result.length + ' prescriptions', 'success');
+                    result.forEach((prescription, index) => {
+                        logPatient(`${index + 1}. Dr. ${prescription.doctorName}: ${prescription.medicines}`, 'info');
+                    });
+                } else {
+                    logPatient('❌ Failed to fetch prescriptions', 'error');
+                }
+            } catch (error) {
+                logPatient('❌ Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function testFullFlow() {
+            logDoctor('🚀 Starting full flow test...', 'info');
+            logPatient('🚀 Starting full flow test...', 'info');
+            
+            // Connect both
+            connectDoctor();
+            connectPatient();
+            
+            // Wait a bit for connections
+            setTimeout(async () => {
+                await createPrescription();
+                
+                // Wait a bit then fetch prescriptions
+                setTimeout(() => {
+                    getPrescriptions();
+                }, 1000);
+            }, 2000);
+        }
+        
+        function clearLogs() {
+            document.getElementById('doctorLog').innerHTML = '';
+            document.getElementById('patientLog').innerHTML = '';
+        }
+    </script>
+</body>
+</html>

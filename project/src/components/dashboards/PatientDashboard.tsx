@@ -6,9 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Clock, User, Pill, Search, CheckCircle, AlertCircle, FileText, Heart, Activity, Video, AudioLines, MapPin, Star, Send, Bot, Stethoscope, ExternalLink } from 'lucide-react';
+import { Calendar, Clock, User, Pill, Search, CheckCircle, AlertCircle, FileText, Heart, Activity, Video, AudioLines, MapPin, Star, Send, Bot, Stethoscope, ExternalLink, Settings, Edit, Save, X, Bell, Mail, Smartphone, Moon, Globe } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-// Removed mock data imports; use backend services only
 import { useToast } from '@/hooks/use-toast';
 import { symptomService, type SymptomResult } from '@/services/symptomService';
 import { appointmentService, type Appointment } from '@/services/appointmentService';
@@ -19,9 +18,10 @@ import { callService } from '@/services/callService';
 import { medicineService, type Medicine } from '@/services/medicineService';
 import { pharmacyService, type Pharmacy } from '@/services/pharmacyService';
 import { prescriptionService, type Prescription } from '@/services/prescriptionService';
+import io from 'socket.io-client';
 
 const PatientDashboard = () => {
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
   const { t } = useLanguage();
   const { toast } = useToast();
   const [medicineSearch, setMedicineSearch] = useState('');
@@ -59,6 +59,27 @@ const PatientDashboard = () => {
     { id: 2, type: 'appointment', title: 'Dr. Sharma Consultation', time: '4:00 PM', status: 'confirmed' },
     { id: 3, type: 'checkup', title: 'Blood Pressure Check', time: '6:00 PM', status: 'pending' }
   ]);
+  
+  // Call functionality state (temporarily disabled)
+  const [socket, setSocket] = useState<any>(null);
+  const [availableDoctors, setAvailableDoctors] = useState<any[]>([]);
+  const [pendingConsultation, setPendingConsultation] = useState<string | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  const [showProfileEdit, setShowProfileEdit] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    name: user?.name || '',
+    phone: user?.phone || '',
+    address: user?.address || '',
+    email: user?.email || ''
+  });
+  const [settings, setSettings] = useState({
+    notifications: true,
+    emailAlerts: true,
+    smsReminders: false,
+    darkMode: false,
+    language: 'en'
+  });
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -71,6 +92,179 @@ const PatientDashboard = () => {
     if (user?.id) {
       loadAppointments();
     }
+  }, [user?.id]);
+  
+  // Initialize socket connection for real-time doctor availability
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const socketConnection = io('http://localhost:5002', {
+      transports: ['websocket', 'polling']
+    });
+    setSocket(socketConnection);
+    
+    socketConnection.on('connect', () => {
+      setConnectionStatus('connected');
+      socketConnection.emit('patient_subscribe', { patientId: user.id });
+      console.log('✅ Patient connected to call server');
+    });
+    
+    socketConnection.on('disconnect', () => {
+      setConnectionStatus('disconnected');
+      console.log('❌ Patient disconnected from call server');
+    });
+    
+    socketConnection.on('connect_error', (error) => {
+      setConnectionStatus('error');
+      console.log('❌ Connection error:', error);
+    });
+    
+    // Listen for doctor status changes
+    socketConnection.on('doctor_status_changed', ({ doctorId, status, doctorInfo }) => {
+      console.log(`🔄 Doctor ${doctorId} is now ${status}`);
+      
+      if (status === 'online' && doctorInfo) {
+        toast({
+          title: 'Doctor Available',
+          description: `Dr. ${doctorInfo.name} is now online and available for consultation`,
+        });
+      }
+      
+      // Update doctors list
+      setAvailableDoctors(prev => {
+        const existingIndex = prev.findIndex(doc => doc.doctorId === doctorId);
+        if (existingIndex >= 0) {
+          const updated = [...prev];
+          updated[existingIndex] = { 
+            ...updated[existingIndex], 
+            online: status === 'online', 
+            ...doctorInfo 
+          };
+          return updated;
+        } else if (status === 'online' && doctorInfo) {
+          return [...prev, { doctorId, online: true, ...doctorInfo }];
+        }
+        return prev;
+      });
+    });
+    
+    // Listen for current doctors status
+    socketConnection.on('doctors_status', (onlineDoctors) => {
+      console.log('📋 Current online doctors:', onlineDoctors);
+      if (onlineDoctors && onlineDoctors.length > 0) {
+        setAvailableDoctors(onlineDoctors.map(doc => ({ ...doc, online: true })));
+      }
+    });
+    
+    // Listen for call start
+    socketConnection.on('move_to_call', ({ roomId, consultationId }) => {
+      console.log('🎉 Patient received move_to_call');
+      console.log(`  - Room ID: ${roomId}`);
+      console.log(`  - Consultation ID: ${consultationId}`);
+      console.log(`  - Current pending: ${pendingConsultation}`);
+      
+      // Always move to call screen when doctor accepts
+      setPendingConsultation(null);
+      setCurrentCallTarget(roomId);
+      setShowVideoCall(true);
+      
+      console.log('🎥 Patient moved to call screen with room:', roomId);
+      
+      toast({
+        title: 'Call Started',
+        description: 'Doctor accepted! Starting video call...',
+      });
+    });
+    
+    socketConnection.on('consultation_rejected', ({ consultationId, reason }) => {
+      console.log('❌ Consultation rejected:', consultationId, reason);
+      setPendingConsultation(null);
+      setShowVideoCall(false);
+      setCurrentCallTarget(null);
+      
+      toast({
+        title: 'Call Request Rejected',
+        description: reason || 'Doctor declined your consultation request',
+        variant: 'destructive'
+      });
+    });
+    
+    socketConnection.on('consultation_reject', ({ consultationId, reason }) => {
+      console.log('❌ Consultation reject event:', consultationId, reason);
+      setPendingConsultation(null);
+      setShowVideoCall(false);
+      setCurrentCallTarget(null);
+      
+      toast({
+        title: 'Call Request Rejected', 
+        description: reason || 'Doctor declined your consultation request',
+        variant: 'destructive'
+      });
+    });
+    
+    // Listen for doctor info updates
+    socketConnection.on('doctor_info_updated', ({ doctorId, doctorInfo }) => {
+      console.log('📋 Doctor info updated:', doctorId, doctorInfo);
+      
+      // Update available doctors list
+      setAvailableDoctors(prev => 
+        prev.map(doctor => 
+          doctor.doctorId === doctorId 
+            ? { ...doctor, ...doctorInfo }
+            : doctor
+        )
+      );
+      
+      toast({
+        title: 'Doctor Info Updated',
+        description: `Dr. ${doctorInfo.name}'s information has been updated`,
+      });
+    });
+    
+    // Listen for new prescriptions
+    socketConnection.on('prescription_added', (prescriptionData) => {
+      console.log('📋 Received prescription notification:', prescriptionData);
+      console.log('  - Patient ID from notification:', prescriptionData.patientId);
+      console.log('  - Current user ID:', user?.id);
+      console.log('  - Match check:', prescriptionData.patientId == user?.id, prescriptionData.patientId === user?.id);
+      
+      // String comparison for patient ID
+      const notificationPatientId = String(prescriptionData.patientId);
+      const currentUserId = String(user?.id);
+      
+      if (notificationPatientId === currentUserId) {
+        console.log('✅ Prescription is for current user');
+        
+        toast({
+          title: '💊 New Prescription',
+          description: `Dr. ${prescriptionData.doctorName} sent you a prescription`,
+        });
+        
+        // Immediate reload
+        loadPrescriptions();
+        
+        // Also reload after delay
+        setTimeout(loadPrescriptions, 2000);
+        
+        // Add reminder
+        if (prescriptionData.medicines) {
+          const medicine = prescriptionData.medicines.split('\n')[0] || 'New Medicine';
+          setUpcomingReminders(prev => [{
+            id: Date.now(),
+            type: 'medicine',
+            title: `New: ${medicine}`,
+            time: 'Now',
+            status: 'pending'
+          }, ...prev]);
+        }
+      }
+    });
+    
+    return () => {
+      if (socketConnection) {
+        socketConnection.disconnect();
+      }
+    };
   }, [user?.id]);
 
   const loadAppointments = async () => {
@@ -252,29 +446,123 @@ const PatientDashboard = () => {
     setNearbyPharmacies(pharmacies);
   };
   
-  const startVideoCall = async (doctorId: string) => {
+  const requestConsultation = async (doctorId: string, consultationType: 'Video' | 'Audio' = 'Video') => {
+    if (pendingConsultation) {
+      toast({
+        title: 'Request Pending',
+        description: 'You already have a consultation request pending',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    if (!socket || !socket.connected) {
+      toast({
+        title: 'Connection Error',
+        description: 'Not connected to call server. Please refresh the page.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     try {
-      await callService.initiateCall(user?.id || '', doctorId, 'VIDEO');
-      setCurrentCallTarget(doctorId);
-      setShowVideoCall(true);
+      const consultationId = `consultation_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      console.log(`📱 Patient requesting consultation: ${consultationId}`);
+      console.log(`  - Doctor ID: ${doctorId}`);
+      console.log(`  - Patient ID: ${user?.id}`);
+      console.log(`  - Type: ${consultationType}`);
+      
+      // Send request via socket
+      socket.emit('consultation_request', {
+        consultationId,
+        doctorId,
+        patientId: user?.id,
+        patientInfo: { name: user?.name || 'Patient' },
+        consultationType
+      });
+      
+      setPendingConsultation(consultationId);
+      console.log(`🔄 Set pending consultation: ${consultationId}`);
       
       toast({
-        title: 'Video Call Started',
-        description: 'Connecting to doctor...',
+        title: 'Consultation Requested',
+        description: `Waiting for doctor to accept your ${consultationType.toLowerCase()} call request...`,
       });
     } catch (error) {
+      console.error('Error requesting consultation:', error);
       toast({
         title: 'Error',
-        description: 'Failed to start video call',
+        description: 'Failed to request consultation',
         variant: 'destructive'
       });
     }
+  };
+  
+  const startVideoCall = async (doctorId: string) => {
+    await requestConsultation(doctorId, 'Video');
   };
   
   const handleCallEnd = () => {
     setShowVideoCall(false);
     setCurrentCallTarget(null);
   };
+
+  const handleProfileUpdate = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const result = await updateProfile(user.id, profileForm);
+      
+      if (result.success) {
+        setShowProfileEdit(false);
+        toast({
+          title: 'Profile Updated',
+          description: 'Your profile information has been updated successfully.',
+        });
+      } else {
+        toast({
+          title: 'Update Failed',
+          description: result.message || 'Failed to update profile',
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update profile',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleSettingsUpdate = () => {
+    try {
+      localStorage.setItem('patientSettings', JSON.stringify(settings));
+      toast({
+        title: 'Settings Updated',
+        description: 'Your preferences have been saved successfully.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to save settings',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  // Load settings on component mount
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('patientSettings');
+    if (savedSettings) {
+      try {
+        setSettings(JSON.parse(savedSettings));
+      } catch (error) {
+        console.error('Error loading settings:', error);
+      }
+    }
+  }, []);
 
 
 
@@ -285,6 +573,7 @@ const PatientDashboard = () => {
         <VideoCall 
           userId={user?.id || ''} 
           targetUserId={currentCallTarget || ''}
+          roomId={currentCallTarget || ''}
           onCallEnd={handleCallEnd}
         />
       </div>
@@ -304,6 +593,16 @@ const PatientDashboard = () => {
             <Heart className="h-3 w-3 mr-1" />
             {t('welcome')}, {user?.name}
           </Badge>
+          <Badge variant="outline" className="bg-primary/10 text-primary font-mono">
+            ID: {user?.id}
+          </Badge>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowSettings(true)}
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
@@ -422,14 +721,23 @@ const PatientDashboard = () => {
               <Button 
                 variant="success" 
                 className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group relative overflow-hidden"
-                onClick={() => toast({ title: 'Video Call', description: 'Connecting to available doctors...' })}
+                onClick={() => {
+                  if (availableDoctors.length > 0) {
+                    requestConsultation(availableDoctors[0].doctorId, 'Video');
+                  } else {
+                    toast({ title: 'No Doctors Available', description: 'No doctors are currently online', variant: 'destructive' });
+                  }
+                }}
+                disabled={availableDoctors.length === 0 || !!pendingConsultation}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-success/20 to-primary/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div className="flex items-center space-x-1 relative z-10">
                   <Video className="h-4 w-4 group-hover:animate-pulse" />
                   <AudioLines className="h-4 w-4 group-hover:animate-pulse" />
                 </div>
-                <span className="relative z-10">{t('videoAudioCall')}</span>
+                <span className="relative z-10">
+                  {pendingConsultation ? 'Request Pending...' : t('videoAudioCall')}
+                </span>
               </Button>
               <Button 
                 variant="secondary" 
@@ -489,6 +797,113 @@ const PatientDashboard = () => {
                   <div className="text-sm text-muted-foreground">Weight</div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+          
+          {/* Available Doctors */}
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Stethoscope className="h-5 w-5 text-primary" />
+                <span>Available Doctors ({availableDoctors.filter(d => d.online).length})</span>
+              </CardTitle>
+              <CardDescription>
+                Online doctors ready for consultation • Call Server: {connectionStatus === 'connected' ? '✅ Connected' : connectionStatus === 'error' ? '❌ Server Offline' : '⏳ Connecting...'}
+                <br />
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => {
+                    console.log('🧪 TEST: Manually triggering move_to_call');
+                    setCurrentCallTarget('test_room_123');
+                    setShowVideoCall(true);
+                  }}
+                  className="mt-2"
+                >
+                  🧪 Test Call Screen
+                </Button>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {availableDoctors.filter(d => d.online).length === 0 ? (
+                <div className="text-center py-8 bg-muted/30 rounded-lg">
+                  <Stethoscope className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-2">No doctors are currently online</p>
+                  <p className="text-sm text-muted-foreground">Please check back later or book an appointment</p>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {availableDoctors.filter(d => d.online).map((doctor) => (
+                    <div key={doctor.doctorId} className="border border-border rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                            <Stethoscope className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <h4 className="font-medium">Dr. {doctor.name}</h4>
+                            <p className="text-sm text-muted-foreground">{doctor.specialization}</p>
+                          </div>
+                        </div>
+                        <Badge variant="default" className="bg-green-100 text-green-800">
+                          <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
+                          Online
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Experience: {doctor.experience || 'Not specified'}
+                      </p>
+                      <div className="flex space-x-2">
+                        <Button
+                          size="sm"
+                          variant="success"
+                          onClick={() => requestConsultation(doctor.doctorId, 'Video')}
+                          disabled={!!pendingConsultation}
+                          className="flex-1 hover:scale-105 transition-transform"
+                        >
+                          <Video className="h-3 w-3 mr-1" />
+                          {pendingConsultation ? 'Pending...' : 'Video Call'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => requestConsultation(doctor.doctorId, 'Audio')}
+                          disabled={!!pendingConsultation}
+                          className="flex-1 hover:scale-105 transition-transform"
+                        >
+                          <AudioLines className="h-3 w-3 mr-1" />
+                          Audio Call
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {pendingConsultation && (
+                <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <div className="w-3 h-3 bg-orange-500 rounded-full animate-pulse"></div>
+                    <span className="font-medium text-orange-800">Consultation Request Pending</span>
+                  </div>
+                  <p className="text-sm text-orange-700">Waiting for doctor to accept your request...</p>
+                  <p className="text-xs text-orange-600 mt-1">The doctor will either accept or decline your request shortly.</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setPendingConsultation(null);
+                      toast({
+                        title: 'Request Cancelled',
+                        description: 'Your consultation request has been cancelled.',
+                      });
+                    }}
+                    className="mt-2"
+                  >
+                    Cancel Request
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
           
@@ -860,10 +1275,86 @@ const PatientDashboard = () => {
               <CardDescription>Active prescriptions from doctors</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex space-x-2 mb-4">
+                <Button 
+                  onClick={loadPrescriptions} 
+                  variant="outline" 
+                  size="sm"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Refresh Prescriptions
+                </Button>
+                <Button 
+                  onClick={() => {
+                    console.log('📝 Current user ID:', user?.id);
+                    console.log('📝 Current prescriptions:', patientPrescriptions);
+                    toast({
+                      title: 'Debug Info',
+                      description: `User ID: ${user?.id}, Prescriptions: ${patientPrescriptions.length}`,
+                    });
+                  }}
+                  variant="ghost"
+                  size="sm"
+                >
+                  🔍 Debug
+                </Button>
+                <Button 
+                  onClick={async () => {
+                    // Test prescription creation by calling doctor API directly
+                    try {
+                      const response = await fetch('http://localhost:8080/api/prescriptions/create', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          patientId: parseInt(user?.id || '1'),
+                          doctorId: 1,
+                          medicines: 'Test Medicine - Take twice daily',
+                          notes: 'Test prescription from patient dashboard'
+                        })
+                      });
+                      const result = await response.json();
+                      if (result.success) {
+                        toast({ title: 'Test Prescription Created', description: `ID: ${result.prescriptionId}` });
+                        loadPrescriptions();
+                      } else {
+                        toast({ title: 'Test Failed', description: result.message, variant: 'destructive' });
+                      }
+                    } catch (error) {
+                      toast({ title: 'Test Error', description: 'Failed to create test prescription', variant: 'destructive' });
+                    }
+                  }}
+                  variant="secondary"
+                  size="sm"
+                >
+                  🧪 Test Prescription
+                </Button>
+                <Button 
+                  onClick={() => {
+                    if (socket && socket.connected) {
+                      socket.emit('medicine_taken_notification', {
+                        patientId: user?.id,
+                        patientName: user?.name,
+                        prescriptionId: 'TEST_123',
+                        doctorName: 'Dr. Test',
+                        takenAt: new Date().toISOString()
+                      });
+                      toast({ title: 'Test Notification Sent', description: 'Sent medicine taken notification to doctor' });
+                    } else {
+                      toast({ title: 'Not Connected', description: 'Socket not connected', variant: 'destructive' });
+                    }
+                  }}
+                  variant="outline"
+                  size="sm"
+                >
+                  📡 Test Notify Doctor
+                </Button>
+              </div>
+              
               {patientPrescriptions.length === 0 ? (
                 <div className="text-center py-8">
                   <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No prescriptions found</p>
+                  <p className="text-muted-foreground mb-2">No prescriptions found</p>
+                  <p className="text-sm text-muted-foreground">Prescriptions from your doctors will appear here</p>
                 </div>
               ) : (
                 patientPrescriptions.map((prescription) => (
@@ -871,7 +1362,7 @@ const PatientDashboard = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
                         <User className="h-4 w-4 text-primary" />
-                        <span className="font-medium">{prescription.doctorName}</span>
+                        <span className="font-medium">Dr. {prescription.doctorName}</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Badge variant={prescription.status === 'active' ? 'default' : 'secondary'}>
@@ -882,14 +1373,19 @@ const PatientDashboard = () => {
                     </div>
 
                     <div className="bg-muted/30 p-3 rounded">
-                      <h5 className="font-medium mb-2">Medicines:</h5>
+                      <h5 className="font-medium mb-2 flex items-center">
+                        <Pill className="h-4 w-4 mr-2 text-success" />
+                        Medicines:
+                      </h5>
                       <p className="text-sm whitespace-pre-wrap">{prescription.medicines}</p>
                     </div>
 
                     {prescription.notes && (
-                      <p className="text-sm text-muted-foreground bg-muted p-2 rounded">
-                        <strong>Notes:</strong> {prescription.notes}
-                      </p>
+                      <div className="bg-blue-50 border border-blue-200 p-3 rounded">
+                        <p className="text-sm text-blue-800">
+                          <strong>Doctor's Notes:</strong> {prescription.notes}
+                        </p>
+                      </div>
                     )}
 
                     <div className="flex space-x-2 pt-2">
@@ -897,9 +1393,53 @@ const PatientDashboard = () => {
                         <MapPin className="h-3 w-3 mr-1" />
                         Find Pharmacy
                       </Button>
-                      <Button size="sm" variant="success">
+                      <Button 
+                        size="sm" 
+                        variant="success"
+                        onClick={async () => {
+                          try {
+                            const response = await fetch(`http://localhost:8080/api/prescriptions/${prescription.id}/mark-taken`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' }
+                            });
+                            const result = await response.json();
+                            if (result.success) {
+                              // Notify doctor via socket
+                              if (socket && socket.connected) {
+                                socket.emit('medicine_taken_notification', {
+                                  patientId: user?.id,
+                                  patientName: user?.name,
+                                  prescriptionId: prescription.id,
+                                  doctorName: prescription.doctorName,
+                                  takenAt: new Date().toISOString()
+                                });
+                                console.log('📡 Sent medicine taken notification via socket');
+                              }
+                              
+                              toast({
+                                title: '✅ Medicine Taken',
+                                description: 'Doctor has been notified that you took your medicine.',
+                              });
+                              loadPrescriptions(); // Refresh the list
+                            } else {
+                              toast({
+                                title: 'Error',
+                                description: result.message || 'Failed to mark as taken',
+                                variant: 'destructive'
+                              });
+                            }
+                          } catch (error) {
+                            toast({
+                              title: 'Error',
+                              description: 'Failed to mark medicine as taken',
+                              variant: 'destructive'
+                            });
+                          }
+                        }}
+                        disabled={prescription.status === 'taken'}
+                      >
                         <CheckCircle className="h-3 w-3 mr-1" />
-                        Mark as Taken
+                        {prescription.status === 'taken' ? 'Taken ✓' : 'Mark as Taken'}
                       </Button>
                     </div>
                   </div>
@@ -908,7 +1448,172 @@ const PatientDashboard = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+
       </Tabs>
+
+      {/* Profile Edit Modal */}
+      {showProfileEdit && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>Edit Profile</span>
+                <Button variant="ghost" size="sm" onClick={() => setShowProfileEdit(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Name</label>
+                <Input
+                  value={profileForm.name}
+                  onChange={(e) => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Enter your name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Phone</label>
+                <Input
+                  value={profileForm.phone}
+                  onChange={(e) => setProfileForm(prev => ({ ...prev, phone: e.target.value }))}
+                  placeholder="Enter phone number"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Email</label>
+                <Input
+                  value={profileForm.email}
+                  onChange={(e) => setProfileForm(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="Enter email address"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Address</label>
+                <Textarea
+                  value={profileForm.address}
+                  onChange={(e) => setProfileForm(prev => ({ ...prev, address: e.target.value }))}
+                  placeholder="Enter your address"
+                  rows={2}
+                />
+              </div>
+
+              <div className="flex space-x-2 pt-4">
+                <Button onClick={handleProfileUpdate} className="flex-1">
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Changes
+                </Button>
+                <Button variant="outline" onClick={() => setShowProfileEdit(false)} className="flex-1">
+                  Cancel
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Settings className="h-5 w-5" />
+                  <span>Settings</span>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setShowSettings(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-muted/30 p-3 rounded-lg border">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Patient ID</span>
+                  <span className="text-sm font-mono bg-primary/10 px-2 py-1 rounded">{user?.id}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Use this ID for prescriptions and appointments</p>
+              </div>
+              
+              <Button
+                onClick={() => {
+                  setProfileForm({
+                    name: user?.name || '',
+                    phone: user?.phone || '',
+                    address: user?.address || '',
+                    email: user?.email || ''
+                  });
+                  setShowSettings(false);
+                  setShowProfileEdit(true);
+                }}
+                variant="outline"
+                className="w-full"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Profile
+              </Button>
+              
+              <div className="border-t pt-4">
+                <h4 className="font-medium mb-3">Preferences</h4>
+                
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <Bell className="h-4 w-4" />
+                    <span>Notifications</span>
+                  </div>
+                  <Button
+                    variant={settings.notifications ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSettings(prev => ({ ...prev, notifications: !prev.notifications }))}
+                  >
+                    {settings.notifications ? 'On' : 'Off'}
+                  </Button>
+                </div>
+                
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <Mail className="h-4 w-4" />
+                    <span>Email Alerts</span>
+                  </div>
+                  <Button
+                    variant={settings.emailAlerts ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSettings(prev => ({ ...prev, emailAlerts: !prev.emailAlerts }))}
+                  >
+                    {settings.emailAlerts ? 'On' : 'Off'}
+                  </Button>
+                </div>
+                
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <Smartphone className="h-4 w-4" />
+                    <span>SMS Reminders</span>
+                  </div>
+                  <Button
+                    variant={settings.smsReminders ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSettings(prev => ({ ...prev, smsReminders: !prev.smsReminders }))}
+                  >
+                    {settings.smsReminders ? 'On' : 'Off'}
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="flex space-x-2 pt-4 border-t">
+                <Button onClick={() => { handleSettingsUpdate(); setShowSettings(false); }} className="flex-1">
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Settings
+                </Button>
+                <Button variant="outline" onClick={() => setShowSettings(false)} className="flex-1">
+                  Close
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Appointment Booking Modal */}
       {showAppointmentBooking && (

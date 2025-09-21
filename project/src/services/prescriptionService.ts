@@ -17,27 +17,43 @@ export const prescriptionService = {
     notes: string;
   }): Promise<{ success: boolean; prescriptionId?: number; message?: string }> {
     try {
+      console.log('📤 Sending prescription request:', data);
       const response = await fetch(`${API_BASE_URL}/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
       
-      if (!response.ok) throw new Error('Failed to create prescription');
-      return response.json();
+      console.log('📥 Response status:', response.status);
+      const result = await response.json();
+      console.log('📥 Response data:', result);
+      
+      if (!response.ok) {
+        throw new Error(result.message || `HTTP ${response.status}`);
+      }
+      
+      return result;
     } catch (error) {
-      console.error('Error creating prescription:', error);
-      return { success: false, message: 'Failed to create prescription' };
+      console.error('❌ Error creating prescription:', error);
+      return { success: false, message: error.message || 'Failed to create prescription' };
     }
   },
 
   async getPatientPrescriptions(patientId: number): Promise<Prescription[]> {
     try {
+      console.log('📤 Fetching prescriptions for patient:', patientId);
       const response = await fetch(`${API_BASE_URL}/patient/${patientId}`);
-      if (!response.ok) throw new Error('Failed to fetch prescriptions');
-      return response.json();
+      
+      if (!response.ok) {
+        console.error('❌ Failed to fetch prescriptions:', response.status);
+        return [];
+      }
+      
+      const result = await response.json();
+      console.log('📥 Prescriptions fetched:', result);
+      return result;
     } catch (error) {
-      console.error('Error fetching prescriptions:', error);
+      console.error('❌ Error fetching prescriptions:', error);
       return [];
     }
   }

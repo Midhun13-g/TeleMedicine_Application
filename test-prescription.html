@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Prescription API</title>
+</head>
+<body>
+    <h1>Test Prescription Functionality</h1>
+    
+    <div>
+        <h2>Create Prescription</h2>
+        <button onclick="createPrescription()">Create Test Prescription</button>
+        <div id="createResult"></div>
+    </div>
+    
+    <div>
+        <h2>Get Patient Prescriptions</h2>
+        <button onclick="getPrescriptions()">Get Prescriptions for Patient 1</button>
+        <div id="getResult"></div>
+    </div>
+
+    <script>
+        async function createPrescription() {
+            try {
+                const response = await fetch('http://localhost:8080/api/prescriptions/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        patientId: 1,
+                        doctorId: 1,
+                        medicines: 'Paracetamol 500mg - Twice daily for 5 days\nAzithromycin 250mg - Once daily for 3 days',
+                        notes: 'Take medicines after meals. Rest for 2-3 days.'
+                    })
+                });
+                
+                const result = await response.json();
+                document.getElementById('createResult').innerHTML = 
+                    '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+            } catch (error) {
+                document.getElementById('createResult').innerHTML = 
+                    '<p style="color: red;">Error: ' + error.message + '</p>';
+            }
+        }
+        
+        async function getPrescriptions() {
+            try {
+                const response = await fetch('http://localhost:8080/api/prescriptions/patient/1');
+                const result = await response.json();
+                document.getElementById('getResult').innerHTML = 
+                    '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+            } catch (error) {
+                document.getElementById('getResult').innerHTML = 
+                    '<p style="color: red;">Error: ' + error.message + '</p>';
+            }
+        }
+    </script>
+</body>
+</html>

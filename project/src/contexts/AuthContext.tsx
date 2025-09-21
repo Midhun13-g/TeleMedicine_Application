@@ -20,6 +20,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
+      console.log('🔐 Attempting login for:', email);
       const response = await fetch('http://localhost:8080/api/auth/login', {
         method: 'POST',
         headers: { 
@@ -29,27 +30,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         body: JSON.stringify({ email, password })
       });
       
+      console.log('📡 Login response status:', response.status);
+      
       if (!response.ok) {
-        console.error('Login failed with status:', response.status);
+        const errorText = await response.text();
+        console.error('❌ Login failed:', response.status, errorText);
         return false;
       }
       
       const data = await response.json();
+      console.log('✅ Login response data:', data);
       
       if (data.success && data.user) {
         setUser(data.user);
         localStorage.setItem('user', JSON.stringify(data.user));
+        console.log('🎉 Login successful for user:', data.user.name, 'Role:', data.user.role);
         return true;
       }
+      console.log('❌ Login failed: Invalid response format');
       return false;
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('💥 Login error:', error);
       return false;
     }
   };
 
   const register = async (userData: any): Promise<{ success: boolean; message?: string }> => {
     try {
+      console.log('📝 Attempting registration for:', userData.email);
       const response = await fetch('http://localhost:8080/api/auth/register', {
         method: 'POST',
         headers: { 
@@ -59,22 +67,60 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         body: JSON.stringify(userData)
       });
       
+      console.log('📡 Registration response status:', response.status);
+      
       if (!response.ok) {
-        console.error('Registration failed with status:', response.status);
-        return { success: false, message: 'Registration failed' };
+        const errorText = await response.text();
+        console.error('❌ Registration failed:', response.status, errorText);
+        return { success: false, message: `Registration failed: ${response.status}` };
       }
       
       const data = await response.json();
+      console.log('✅ Registration response:', data);
+      
+      if (data.success) {
+        console.log('🎉 Registration successful for:', userData.email);
+      }
+      
       return data;
     } catch (error) {
-      console.error('Registration error:', error);
-      return { success: false, message: 'Network error. Please check if the server is running.' };
+      console.error('💥 Registration error:', error);
+      return { success: false, message: 'Network error. Please check if the backend server is running on port 8080.' };
     }
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
+  };
+
+  const updateProfile = async (userId: string, profileData: any): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/auth/profile/${userId}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(profileData)
+      });
+      
+      if (!response.ok) {
+        return { success: false, message: 'Profile update failed' };
+      }
+      
+      const data = await response.json();
+      
+      if (data.success && data.user) {
+        setUser(data.user);
+        localStorage.setItem('user', JSON.stringify(data.user));
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Profile update error:', error);
+      return { success: false, message: 'Network error during profile update' };
+    }
   };
 
   React.useEffect(() => {
@@ -91,6 +137,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         login,
         register,
         logout,
+        updateProfile,
         isAuthenticated: !!user,
       }}
     >

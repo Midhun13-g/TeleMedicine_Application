@@ -1,0 +1,21 @@
+{
+  "name": "telemedicine-call-server",
+  "version": "1.0.0",
+  "description": "Unified call server for TeleMedicine Application with doctor presence, consultations, and WebRTC signaling",
+  "main": "unified-call-server.js",
+  "scripts": {
+    "start": "node unified-call-server.js",
+    "dev": "nodemon unified-call-server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": ["telemedicine", "webrtc", "video-call", "doctor", "patient"],
+  "author": "TeleMedicine Team",
+  "license": "MIT"
+}

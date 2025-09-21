@@ -5,6 +5,7 @@ import com.example.projectbackend.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Service
 public class UserService {
@@ -38,6 +39,11 @@ public class UserService {
         if (user.getId() == null) {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
         }
+        user.setUpdatedAt(LocalDateTime.now());
         return userRepository.save(user);
+    }
+    
+    public List<User> getAllUsers() {
+        return userRepository.findAll();
     }
 }

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Direct Prescription Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        button { padding: 10px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; }
+        .result { margin: 10px 0; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .error { background: #f8d7da; border-color: #f5c6cb; }
+    </style>
+</head>
+<body>
+    <h1>Direct Prescription Test</h1>
+    
+    <button onclick="testPrescription()">Create Test Prescription</button>
+    <button onclick="getPrescriptions()">Get Patient Prescriptions</button>
+    <button onclick="clearResults()">Clear</button>
+    
+    <div id="results"></div>
+
+    <script>
+        function log(message, isError = false) {
+            const div = document.createElement('div');
+            div.className = 'result ' + (isError ? 'error' : 'success');
+            div.innerHTML = new Date().toLocaleTimeString() + ': ' + message;
+            document.getElementById('results').appendChild(div);
+        }
+
+        async function testPrescription() {
+            try {
+                log('Creating prescription...');
+                
+                const response = await fetch('http://localhost:8080/api/prescriptions/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        patientId: 1,
+                        doctorId: 1,
+                        medicines: 'Paracetamol 500mg - Take twice daily for 5 days',
+                        notes: 'Take after meals. Rest well.'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    log('✅ Prescription created! ID: ' + result.prescriptionId);
+                } else {
+                    log('❌ Failed: ' + (result.message || 'Unknown error'), true);
+                }
+            } catch (error) {
+                log('❌ Network error: ' + error.message, true);
+            }
+        }
+        
+        async function getPrescriptions() {
+            try {
+                log('Fetching prescriptions...');
+                
+                const response = await fetch('http://localhost:8080/api/prescriptions/patient/1');
+                const result = await response.json();
+                
+                if (response.ok) {
+                    log('✅ Found ' + result.length + ' prescriptions');
+                    result.forEach((p, i) => {
+                        log(`${i+1}. Dr. ${p.doctorName}: ${p.medicines.substring(0, 50)}...`);
+                    });
+                } else {
+                    log('❌ Failed to fetch prescriptions', true);
+                }
+            } catch (error) {
+                log('❌ Network error: ' + error.message, true);
+            }
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+    </script>
+</body>
+</html>
