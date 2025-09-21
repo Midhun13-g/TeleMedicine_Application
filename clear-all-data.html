@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear All Data</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        button { padding: 15px 30px; font-size: 16px; margin: 10px; border: none; border-radius: 5px; cursor: pointer; }
+        .danger { background: #dc3545; color: white; }
+        .success { background: #28a745; color: white; }
+        .result { padding: 15px; margin: 15px 0; border-radius: 5px; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; }
+        .ok { background: #d4edda; border: 1px solid #c3e6cb; }
+    </style>
+</head>
+<body>
+    <h1>🗑️ Clear All Data</h1>
+    <p><strong>⚠️ WARNING:</strong> This will remove ALL data from the database!</p>
+    
+    <button class="success" onclick="showAllData()">📋 Show All Data</button>
+    <button class="danger" onclick="clearAllData()">🗑️ Clear Everything</button>
+    
+    <div id="result"></div>
+
+    <script>
+        async function showAllData() {
+            try {
+                // Get medicines
+                const medicinesResponse = await fetch('http://localhost:8080/api/medicines/search');
+                const medicines = await medicinesResponse.json();
+                
+                // Get users (debug endpoint)
+                const usersResponse = await fetch('http://localhost:8080/api/prescriptions/debug/users');
+                const usersData = await usersResponse.json();
+                
+                const resultDiv = document.getElementById('result');
+                resultDiv.className = 'result ok';
+                resultDiv.innerHTML = `
+                    <h3>📊 Current Data:</h3>
+                    <p><strong>Medicines:</strong> ${medicines.length}</p>
+                    <p><strong>Users:</strong> ${usersData.totalUsers || 0}</p>
+                    <details>
+                        <summary>View Details</summary>
+                        <h4>Medicines:</h4>
+                        <pre>${JSON.stringify(medicines, null, 2)}</pre>
+                        <h4>Users:</h4>
+                        <pre>${JSON.stringify(usersData, null, 2)}</pre>
+                    </details>
+                `;
+            } catch (error) {
+                const resultDiv = document.getElementById('result');
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<h3>❌ Error:</h3><p>${error.message}</p>`;
+            }
+        }
+
+        async function clearAllData() {
+            if (!confirm('⚠️ Are you ABSOLUTELY sure you want to delete ALL data?\n\nThis will remove:\n- All medicines\n- All users\n- All prescriptions\n- Everything!\n\nThis CANNOT be undone!')) {
+                return;
+            }
+
+            if (!confirm('Last chance! This will permanently delete EVERYTHING. Continue?')) {
+                return;
+            }
+
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = 'result ok';
+            resultDiv.innerHTML = '<h3>🔄 Clearing data...</h3>';
+
+            let totalDeleted = 0;
+            let errors = 0;
+
+            try {
+                // Clear medicines
+                const medicinesResponse = await fetch('http://localhost:8080/api/medicines/search');
+                const medicines = await medicinesResponse.json();
+                
+                for (const medicine of medicines) {
+                    try {
+                        const deleteResponse = await fetch(`http://localhost:8080/api/medicines/delete/${medicine.id}`, {
+                            method: 'DELETE'
+                        });
+                        const result = await deleteResponse.json();
+                        if (result.success) {
+                            totalDeleted++;
+                        } else {
+                            errors++;
+                        }
+                    } catch (error) {
+                        errors++;
+                    }
+                }
+                
+                resultDiv.innerHTML = `
+                    <h3>✅ Database Cleared!</h3>
+                    <p><strong>Medicines deleted:</strong> ${totalDeleted}</p>
+                    <p><strong>Errors:</strong> ${errors}</p>
+                    <p><strong>Status:</strong> Database is now empty and ready for fresh data</p>
+                    <p><em>Note: Users are managed by the authentication system and will be cleared on server restart.</em></p>
+                `;
+                
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<h3>❌ Error:</h3><p>${error.message}</p>`;
+            }
+        }
+
+        // Auto-load data on page load
+        window.onload = showAllData;
+    </script>
+</body>
+</html>

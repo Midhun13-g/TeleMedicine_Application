@@ -34,13 +34,20 @@ export interface Medicine {
 }
 
 export interface MedicineStock {
-  id: string;
-  pharmacyId: string;
+  id: number;
+  pharmacyId: number;
   name: string;
   stock: number;
   price: number;
   manufacturer: string;
   expiryDate: string;
+  category: string;
+  description: string;
+  dosage: string;
+  sideEffects: string;
+  available: boolean;
+  minStockLevel: number;
+  batchNumber: string;
 }
 
 export interface SymptomCheck {

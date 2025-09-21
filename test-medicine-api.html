@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Medicine API</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        button { padding: 10px; margin: 5px; }
+        input, textarea { width: 300px; padding: 5px; margin: 5px; }
+        .result { background: #f5f5f5; padding: 10px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>Medicine API Test</h1>
+    
+    <div class="section">
+        <h3>Add Medicine</h3>
+        <input type="text" id="medicineName" placeholder="Medicine Name" value="Paracetamol">
+        <input type="number" id="medicineStock" placeholder="Stock" value="100">
+        <input type="number" id="medicinePrice" placeholder="Price" value="25.50">
+        <input type="text" id="medicineManufacturer" placeholder="Manufacturer" value="Sun Pharma">
+        <input type="text" id="medicineCategory" placeholder="Category" value="Pain Relief">
+        <input type="number" id="pharmacyId" placeholder="Pharmacy ID" value="1">
+        <br>
+        <button onclick="addMedicine()">Add Medicine</button>
+        <div id="addResult" class="result"></div>
+    </div>
+
+    <div class="section">
+        <h3>Get Pharmacy Medicines</h3>
+        <input type="number" id="getPharmacyId" placeholder="Pharmacy ID" value="1">
+        <button onclick="getPharmacyMedicines()">Get Medicines</button>
+        <div id="getResult" class="result"></div>
+    </div>
+
+    <div class="section">
+        <h3>Search Medicines</h3>
+        <input type="text" id="searchQuery" placeholder="Search Query" value="Paracetamol">
+        <button onclick="searchMedicines()">Search</button>
+        <div id="searchResult" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api';
+
+        async function addMedicine() {
+            const medicine = {
+                name: document.getElementById('medicineName').value,
+                stock: parseInt(document.getElementById('medicineStock').value),
+                price: parseFloat(document.getElementById('medicinePrice').value),
+                manufacturer: document.getElementById('medicineManufacturer').value,
+                category: document.getElementById('medicineCategory').value,
+                pharmacyId: parseInt(document.getElementById('pharmacyId').value),
+                available: true,
+                minStockLevel: 10
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/medicines/add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(medicine)
+                });
+                const result = await response.json();
+                document.getElementById('addResult').innerHTML = JSON.stringify(result, null, 2);
+            } catch (error) {
+                document.getElementById('addResult').innerHTML = 'Error: ' + error.message;
+            }
+        }
+
+        async function getPharmacyMedicines() {
+            const pharmacyId = document.getElementById('getPharmacyId').value;
+            try {
+                const response = await fetch(`${API_BASE}/medicines/pharmacy/${pharmacyId}`);
+                const result = await response.json();
+                document.getElementById('getResult').innerHTML = JSON.stringify(result, null, 2);
+            } catch (error) {
+                document.getElementById('getResult').innerHTML = 'Error: ' + error.message;
+            }
+        }
+
+        async function searchMedicines() {
+            const query = document.getElementById('searchQuery').value;
+            try {
+                const response = await fetch(`${API_BASE}/medicines/search?q=${encodeURIComponent(query)}`);
+                const result = await response.json();
+                document.getElementById('searchResult').innerHTML = JSON.stringify(result, null, 2);
+            } catch (error) {
+                document.getElementById('searchResult').innerHTML = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

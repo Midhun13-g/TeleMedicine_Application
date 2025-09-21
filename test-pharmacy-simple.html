@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Pharmacy API - Simple</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .section { background: white; margin: 20px 0; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        input { width: 200px; padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 4px; }
+        .result { background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 4px; border-left: 4px solid #007bff; }
+        .success { border-left-color: #28a745; }
+        .error { border-left-color: #dc3545; }
+        pre { white-space: pre-wrap; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏥 Pharmacy API Test - Simple Version</h1>
+        
+        <div class="section">
+            <h3>📋 Get All Medicines for Pharmacy 1</h3>
+            <button onclick="getAllMedicines()">Get Medicines</button>
+            <div id="getAllResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h3>➕ Add New Medicine</h3>
+            <div>
+                <input type="text" id="medicineName" placeholder="Medicine Name" value="Test Medicine">
+                <input type="number" id="medicineStock" placeholder="Stock" value="50">
+                <input type="number" id="medicinePrice" placeholder="Price" value="15.75">
+                <input type="text" id="medicineManufacturer" placeholder="Manufacturer" value="Test Pharma">
+                <input type="text" id="medicineCategory" placeholder="Category" value="Test Category">
+            </div>
+            <button onclick="addMedicine()">Add Medicine</button>
+            <div id="addResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h3>🔄 Update Stock</h3>
+            <input type="number" id="updateMedicineId" placeholder="Medicine ID" value="1">
+            <input type="number" id="newStock" placeholder="New Stock" value="25">
+            <button onclick="updateStock()">Update Stock</button>
+            <div id="updateResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h3>🗑️ Delete Medicine</h3>
+            <input type="number" id="deleteMedicineId" placeholder="Medicine ID" value="">
+            <button onclick="deleteMedicine()">Delete Medicine</button>
+            <div id="deleteResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h3>🔍 Search Medicines</h3>
+            <input type="text" id="searchQuery" placeholder="Search Query" value="Paracetamol">
+            <button onclick="searchMedicines()">Search</button>
+            <div id="searchResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api';
+
+        function showResult(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.className = `result ${isError ? 'error' : 'success'}`;
+            element.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        }
+
+        async function getAllMedicines() {
+            try {
+                const response = await fetch(`${API_BASE}/medicines/pharmacy/1`);
+                const data = await response.json();
+                showResult('getAllResult', data);
+            } catch (error) {
+                showResult('getAllResult', { error: error.message }, true);
+            }
+        }
+
+        async function addMedicine() {
+            const medicine = {
+                name: document.getElementById('medicineName').value,
+                stock: parseInt(document.getElementById('medicineStock').value),
+                price: parseFloat(document.getElementById('medicinePrice').value),
+                manufacturer: document.getElementById('medicineManufacturer').value,
+                category: document.getElementById('medicineCategory').value,
+                pharmacyId: 1,
+                available: true,
+                minStockLevel: 10
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/medicines/add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(medicine)
+                });
+                const data = await response.json();
+                showResult('addResult', data);
+            } catch (error) {
+                showResult('addResult', { error: error.message }, true);
+            }
+        }
+
+        async function updateStock() {
+            const medicineId = document.getElementById('updateMedicineId').value;
+            const stock = parseInt(document.getElementById('newStock').value);
+
+            try {
+                const response = await fetch(`${API_BASE}/medicines/update-stock/${medicineId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ stock })
+                });
+                const data = await response.json();
+                showResult('updateResult', data);
+            } catch (error) {
+                showResult('updateResult', { error: error.message }, true);
+            }
+        }
+
+        async function deleteMedicine() {
+            const medicineId = document.getElementById('deleteMedicineId').value;
+            if (!medicineId) {
+                showResult('deleteResult', { error: 'Please enter a medicine ID' }, true);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/medicines/delete/${medicineId}`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                showResult('deleteResult', data);
+            } catch (error) {
+                showResult('deleteResult', { error: error.message }, true);
+            }
+        }
+
+        async function searchMedicines() {
+            const query = document.getElementById('searchQuery').value;
+            try {
+                const response = await fetch(`${API_BASE}/medicines/search?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                showResult('searchResult', data);
+            } catch (error) {
+                showResult('searchResult', { error: error.message }, true);
+            }
+        }
+
+        // Auto-load medicines on page load
+        window.onload = function() {
+            getAllMedicines();
+        };
+    </script>
+</body>
+</html>

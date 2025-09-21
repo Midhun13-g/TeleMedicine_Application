@@ -25,4 +25,21 @@ public class Medicine {
     private Boolean available = true;
     private String dosage;
     private String sideEffects;
+    
+    // Stock management fields
+    private Integer stock = 0;
+    private Integer minStockLevel = 10;
+    private String expiryDate;
+    private String batchNumber;
+    
+    // Pharmacy association
+    private Long pharmacyId;
+    
+    public boolean isLowStock() {
+        return stock != null && stock < minStockLevel;
+    }
+    
+    public boolean isOutOfStock() {
+        return stock == null || stock == 0;
+    }
 }

@@ -23,6 +23,60 @@ public class MedicineController {
         return ResponseEntity.ok(medicines);
     }
     
+    @PostMapping("/add")
+    public ResponseEntity<Map<String, Object>> addMedicine(@RequestBody Medicine medicine) {
+        try {
+            Medicine saved = medicineService.save(medicine);
+            return ResponseEntity.ok(Map.of("success", true, "medicine", saved));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+    
+    @PutMapping("/update/{id}")
+    public ResponseEntity<Map<String, Object>> updateMedicine(@PathVariable Long id, @RequestBody Medicine medicine) {
+        try {
+            medicine.setId(id);
+            Medicine updated = medicineService.save(medicine);
+            return ResponseEntity.ok(Map.of("success", true, "medicine", updated));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+    
+    @PutMapping("/update-stock/{id}")
+    public ResponseEntity<Map<String, Object>> updateStock(@PathVariable Long id, @RequestBody Map<String, Integer> request) {
+        try {
+            Integer newStock = request.get("stock");
+            Medicine updated = medicineService.updateStock(id, newStock);
+            return ResponseEntity.ok(Map.of("success", true, "medicine", updated));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+    
+    @GetMapping("/pharmacy/{pharmacyId}")
+    public ResponseEntity<List<Medicine>> getPharmacyMedicines(@PathVariable Long pharmacyId) {
+        List<Medicine> medicines = medicineService.getMedicinesByPharmacy(pharmacyId);
+        return ResponseEntity.ok(medicines);
+    }
+    
+    @GetMapping("/low-stock/{pharmacyId}")
+    public ResponseEntity<List<Medicine>> getLowStockMedicines(@PathVariable Long pharmacyId) {
+        List<Medicine> medicines = medicineService.getLowStockMedicines(pharmacyId);
+        return ResponseEntity.ok(medicines);
+    }
+    
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<Map<String, Object>> deleteMedicine(@PathVariable Long id) {
+        try {
+            medicineService.deleteMedicine(id);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Medicine deleted successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+    
     @GetMapping("/popular")
     public ResponseEntity<List<Map<String, Object>>> getPopularMedicines() {
         List<Map<String, Object>> popular = List.of(
@@ -43,11 +97,6 @@ public class MedicineController {
         Map<String, Object> response = new HashMap<>();
         response.put("medicine", medicineName);
         response.put("available", available);
-        response.put("nearbyPharmacies", List.of(
-            Map.of("name", "Apollo Pharmacy", "distance", "0.5 km", "contact", "+91-9876543210"),
-            Map.of("name", "MedPlus", "distance", "1.2 km", "contact", "+91-9876543211"),
-            Map.of("name", "Wellness Pharmacy", "distance", "2.1 km", "contact", "+91-9876543212")
-        ));
         
         return ResponseEntity.ok(response);
     }
