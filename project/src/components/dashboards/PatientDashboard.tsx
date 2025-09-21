@@ -18,6 +18,7 @@ import { callService } from '@/services/callService';
 import { medicineService, type Medicine } from '@/services/medicineService';
 import { pharmacyService, type Pharmacy } from '@/services/pharmacyService';
 import { prescriptionService, type Prescription } from '@/services/prescriptionService';
+import { realtimeService } from '@/services/realtimeService';
 import MedicineSearch from '@/components/MedicineSearch';
 import io from 'socket.io-client';
 
@@ -81,6 +82,7 @@ const PatientDashboard = () => {
     language: 'en'
   });
   const [showSettings, setShowSettings] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     if (user?.id) {
@@ -629,13 +631,13 @@ const PatientDashboard = () => {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">{t('overview')}</TabsTrigger>
           <TabsTrigger value="symptoms">{t('symptoms')}</TabsTrigger>
           <TabsTrigger value="appointments">{t('appointments')}</TabsTrigger>
-          <TabsTrigger value="medicines">{t('medicines')}</TabsTrigger>
-          <TabsTrigger value="search">Search Medicines</TabsTrigger>
+          <TabsTrigger value="prescriptions">Prescriptions</TabsTrigger>
+          <TabsTrigger value="medicines">Medicine Availability</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -712,45 +714,38 @@ const PatientDashboard = () => {
               <Button 
                 variant="outline" 
                 className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group"
-                onClick={() => setMedicineSearch('')}
+                onClick={() => setActiveTab('medicines')}
               >
                 <div className="relative">
                   <Search className="h-6 w-6 group-hover:scale-110 transition-transform" />
                   <div className="absolute -top-1 -right-1 w-3 h-3 bg-success rounded-full animate-pulse"></div>
                 </div>
-                <span>{t('checkMedicine')}</span>
+                <span>Check Medicine</span>
               </Button>
               <Button 
-                variant="success" 
-                className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group relative overflow-hidden"
-                onClick={() => {
-                  if (availableDoctors.length > 0) {
-                    requestConsultation(availableDoctors[0].doctorId, 'Video');
-                  } else {
-                    toast({ title: 'No Doctors Available', description: 'No doctors are currently online', variant: 'destructive' });
-                  }
-                }}
-                disabled={availableDoctors.length === 0 || !!pendingConsultation}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-success/20 to-primary/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <div className="flex items-center space-x-1 relative z-10">
-                  <Video className="h-4 w-4 group-hover:animate-pulse" />
-                  <AudioLines className="h-4 w-4 group-hover:animate-pulse" />
-                </div>
-                <span className="relative z-10">
-                  {pendingConsultation ? 'Request Pending...' : t('videoAudioCall')}
-                </span>
-              </Button>
-              <Button 
-                variant="secondary" 
+                variant="warning" 
                 className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group"
-                onClick={findNearbyPharmacies}
+                onClick={() => setActiveTab('symptoms')}
               >
                 <div className="relative">
-                  <MapPin className="h-6 w-6 group-hover:animate-bounce" />
-                  <div className="absolute inset-0 bg-warning/20 rounded-full animate-ping opacity-0 group-hover:opacity-100"></div>
+                  <Bot className="h-6 w-6 group-hover:animate-pulse" />
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full animate-pulse"></div>
                 </div>
-                <span>{t('findPharmacy')}</span>
+                <span>AI Symptoms</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group"
+                onClick={() => {
+                  setActiveTab('prescriptions');
+                  loadPrescriptions();
+                }}
+              >
+                <div className="relative">
+                  <FileText className="h-6 w-6 group-hover:scale-110 transition-transform" />
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                </div>
+                <span>My Prescriptions</span>
               </Button>
             </CardContent>
           </Card>
@@ -1158,122 +1153,11 @@ const PatientDashboard = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="medicines" className="space-y-4">
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle>{t('medicineAvailability')}</CardTitle>
-              <CardDescription>Check if medicines are available at nearby pharmacies</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex space-x-2">
-                <Input
-                  placeholder={t('searchMedicine')}
-                  value={medicineSearch}
-                  onChange={(e) => setMedicineSearch(e.target.value)}
-                  className="flex-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
-                />
-                <Button 
-                  onClick={searchMedicine} 
-                  variant="medical" 
-                  className="hover:scale-105 transition-transform"
-                  disabled={isSearchingMedicine}
-                >
-                  <Search className="h-4 w-4" />
-                  {isSearchingMedicine ? 'Searching...' : t('search')}
-                </Button>
-              </div>
-
-              {/* Medicine Search Results */}
-              {medicineResults.length > 0 && (
-                <div>
-                  <h4 className="font-medium mb-2">Search Results</h4>
-                  <div className="space-y-2">
-                    {medicineResults.map((medicine) => (
-                      <div key={medicine.id} className="border rounded-lg p-3 hover:shadow-md transition-shadow">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h5 className="font-medium">{medicine.name}</h5>
-                            <p className="text-sm text-muted-foreground">{medicine.manufacturer} • {medicine.category}</p>
-                            <p className="text-sm">{medicine.description}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium">₹{medicine.price}</p>
-                            <Badge variant={medicine.available ? 'default' : 'secondary'}>
-                              {medicine.available ? 'Available' : 'Out of Stock'}
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="flex gap-2 mt-2">
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => checkMedicineAvailability(medicine.name)}
-                          >
-                            Check Availability
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Popular medicines */}
-              <div>
-                <h4 className="font-medium mb-2">{t('popularMedicines')}</h4>
-                <div className="flex flex-wrap gap-2">
-                  {['Paracetamol', 'Azithromycin', 'Cetirizine', 'Amoxicillin'].map((medicine) => (
-                    <Button
-                      key={medicine}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setMedicineSearch(medicine)}
-                      className="hover:scale-105 transition-transform"
-                    >
-                      {medicine}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Nearby Pharmacies */}
-              {nearbyPharmacies.length > 0 && (
-                <div>
-                  <h4 className="font-medium mb-2">Nearby Pharmacies</h4>
-                  <div className="space-y-2">
-                    {nearbyPharmacies.map((pharmacy) => (
-                      <div key={pharmacy.id} className="border rounded-lg p-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h5 className="font-medium">{pharmacy.name}</h5>
-                            <p className="text-sm text-muted-foreground">{pharmacy.address}</p>
-                            <p className="text-sm">{pharmacy.openHours}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm font-medium">{pharmacy.distance}</p>
-                            <div className="flex items-center">
-                              {[...Array(5)].map((_, i) => (
-                                <Star key={i} className={`h-3 w-3 ${i < pharmacy.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
-                              ))}
-                            </div>
-                            {pharmacy.is24Hours && <Badge variant="outline" className="text-xs">24 Hours</Badge>}
-                          </div>
-                        </div>
-                        <Button size="sm" variant="outline" className="mt-2">
-                          <MapPin className="h-3 w-3 mr-1" />
-                          Get Directions
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <TabsContent value="prescriptions" className="space-y-4">
 
           <Card className="shadow-card">
             <CardHeader>
-              <CardTitle>{t('yourPrescriptions')}</CardTitle>
+              <CardTitle>Your Prescriptions</CardTitle>
               <CardDescription>Active prescriptions from doctors</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1418,6 +1302,15 @@ const PatientDashboard = () => {
                                 console.log('📡 Sent medicine taken notification via socket');
                               }
                               
+                              // Notify pharmacy
+                              realtimeService.notifyMedicineTaken({
+                                patientId: user?.id || '',
+                                patientName: user?.name || 'Patient',
+                                prescriptionId: prescription.id,
+                                medicines: prescription.medicines,
+                                takenAt: new Date().toISOString()
+                              });
+                              
                               toast({
                                 title: '✅ Medicine Taken',
                                 description: 'Doctor has been notified that you took your medicine.',
@@ -1451,8 +1344,118 @@ const PatientDashboard = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="search" className="space-y-4">
-          <MedicineSearch />
+        <TabsContent value="medicines" className="space-y-4">
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle>Medicine Availability</CardTitle>
+              <CardDescription>Check if medicines are available at nearby pharmacies</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex space-x-2">
+                <Input
+                  placeholder="Search medicine..."
+                  value={medicineSearch}
+                  onChange={(e) => setMedicineSearch(e.target.value)}
+                  className="flex-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                />
+                <Button 
+                  onClick={searchMedicine} 
+                  variant="medical" 
+                  className="hover:scale-105 transition-transform"
+                  disabled={isSearchingMedicine}
+                >
+                  <Search className="h-4 w-4" />
+                  {isSearchingMedicine ? 'Searching...' : 'Search'}
+                </Button>
+              </div>
+
+              {/* Medicine Search Results */}
+              {medicineResults.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-2">Search Results</h4>
+                  <div className="space-y-2">
+                    {medicineResults.map((medicine) => (
+                      <div key={medicine.id} className="border rounded-lg p-3 hover:shadow-md transition-shadow">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h5 className="font-medium">{medicine.name}</h5>
+                            <p className="text-sm text-muted-foreground">{medicine.manufacturer} • {medicine.category}</p>
+                            <p className="text-sm">{medicine.description}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium">₹{medicine.price}</p>
+                            <Badge variant={medicine.available ? 'default' : 'secondary'}>
+                              {medicine.available ? 'Available' : 'Out of Stock'}
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => checkMedicineAvailability(medicine.name)}
+                          >
+                            Check Availability
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Popular medicines */}
+              <div>
+                <h4 className="font-medium mb-2">Popular Medicines</h4>
+                <div className="flex flex-wrap gap-2">
+                  {['Paracetamol', 'Azithromycin', 'Cetirizine', 'Amoxicillin'].map((medicine) => (
+                    <Button
+                      key={medicine}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setMedicineSearch(medicine)}
+                      className="hover:scale-105 transition-transform"
+                    >
+                      {medicine}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Nearby Pharmacies */}
+              {nearbyPharmacies.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-2">Nearby Pharmacies</h4>
+                  <div className="space-y-2">
+                    {nearbyPharmacies.map((pharmacy) => (
+                      <div key={pharmacy.id} className="border rounded-lg p-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h5 className="font-medium">{pharmacy.name}</h5>
+                            <p className="text-sm text-muted-foreground">{pharmacy.address}</p>
+                            <p className="text-sm">{pharmacy.openHours}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium">{pharmacy.distance}</p>
+                            <div className="flex items-center">
+                              {[...Array(5)].map((_, i) => (
+                                <Star key={i} className={`h-3 w-3 ${i < pharmacy.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
+                              ))}
+                            </div>
+                            {pharmacy.is24Hours && <Badge variant="outline" className="text-xs">24 Hours</Badge>}
+                          </div>
+                        </div>
+                        <Button size="sm" variant="outline" className="mt-2">
+                          <MapPin className="h-3 w-3 mr-1" />
+                          Get Directions
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
       </Tabs>

@@ -14,6 +14,7 @@ import { VideoCall } from '@/components/VideoCall';
 import { CallNotification } from '@/components/CallNotification';
 import { callService } from '@/services/callService';
 import { prescriptionService } from '@/services/prescriptionService';
+import { realtimeService } from '@/services/realtimeService';
 import io from 'socket.io-client';
 
 const DoctorDashboard = () => {
@@ -297,6 +298,15 @@ const DoctorDashboard = () => {
         
         setPrescriptionForm({ patientId: '', medicines: '', notes: '' });
         setTodayStats(prev => ({ ...prev, prescriptions: prev.prescriptions + 1 }));
+        
+        // Notify pharmacy
+        realtimeService.notifyPrescriptionAdded({
+          prescriptionId: result.prescriptionId,
+          doctorName: user?.name || 'Doctor',
+          medicines: prescriptionForm.medicines,
+          patientId: prescriptionForm.patientId,
+          notes: prescriptionForm.notes
+        });
       } else {
         console.error('Prescription creation failed:', result);
         toast({
@@ -816,23 +826,62 @@ const DoctorDashboard = () => {
               <CardDescription>Common tasks for doctors</CardDescription>
             </CardHeader>
             <CardContent className="grid md:grid-cols-4 gap-4">
-              <Button variant="medical" className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group relative overflow-hidden">
+              <Button 
+                variant="medical" 
+                className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group relative overflow-hidden"
+                onClick={() => {
+                  const appointmentsTab = document.querySelector('[value="appointments"]') as HTMLElement;
+                  if (appointmentsTab) appointmentsTab.click();
+                }}
+              >
                 <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-success/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <CheckCircle className="h-6 w-6 relative z-10 group-hover:animate-pulse" />
                 <span className="relative z-10">{t('approve')} {t('appointments')}</span>
               </Button>
-              <Button variant="outline" className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group">
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group"
+                onClick={() => {
+                  const prescriptionsTab = document.querySelector('[data-state="inactive"][value="prescriptions"]') as HTMLElement;
+                  if (prescriptionsTab) {
+                    prescriptionsTab.click();
+                  } else {
+                    // Fallback: try different selector
+                    const allTabs = document.querySelectorAll('[role="tab"]');
+                    const prescTab = Array.from(allTabs).find(tab => 
+                      tab.textContent?.toLowerCase().includes('prescription')
+                    ) as HTMLElement;
+                    if (prescTab) prescTab.click();
+                  }
+                }}
+              >
                 <FileText className="h-6 w-6 group-hover:scale-110 transition-transform" />
                 <span>Write {t('prescriptions')}</span>
               </Button>
-              <Button variant="success" className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group">
+              <Button 
+                variant="success" 
+                className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group"
+                onClick={() => {
+                  const consultationsTab = document.querySelector('[value="consultations"]') as HTMLElement;
+                  if (consultationsTab) consultationsTab.click();
+                }}
+              >
                 <div className="flex items-center space-x-1">
                   <Video className="h-4 w-4 group-hover:animate-pulse" />
                   <AudioLines className="h-4 w-4 group-hover:animate-pulse" />
                 </div>
                 <span>{t('startConsultation')}</span>
               </Button>
-              <Button variant="secondary" className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group">
+              <Button 
+                variant="secondary" 
+                className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group"
+                onClick={() => {
+                  toast({
+                    title: 'Messages',
+                    description: 'Patient messaging system will be available soon.',
+                  });
+                }}
+              >
                 <div className="relative">
                   <MessageSquare className="h-6 w-6 group-hover:animate-bounce" />
                   <div className="absolute -top-1 -right-1 w-3 h-3 bg-emergency rounded-full animate-pulse"></div>
@@ -1352,6 +1401,7 @@ const DoctorDashboard = () => {
                     setShowPrescriptionModal(false);
                     setCallPatientInfo(null);
                     setPrescriptionForm({ patientId: '', medicines: '', notes: '' });
+                    setTodayStats(prev => ({ ...prev, prescriptions: prev.prescriptions + 1 }));
                   }} 
                   className="flex-1"
                   disabled={!prescriptionForm.medicines.trim()}

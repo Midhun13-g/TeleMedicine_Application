@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Package, AlertTriangle, Plus, Trash2, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { realtimeService } from '@/services/realtimeService';
 
 interface Medicine {
   id: number;
@@ -53,7 +54,31 @@ const PharmacyDashboard = () => {
     loadMedicines();
     // Auto-refresh every 15 seconds
     const interval = setInterval(loadMedicines, 15000);
-    return () => clearInterval(interval);
+    
+    // Listen for prescription updates from doctors
+    const unsubscribePrescription = realtimeService.onPrescriptionAdded((data) => {
+      console.log('📋 Pharmacy received prescription update:', data);
+      toast({
+        title: '📋 New Prescription',
+        description: `New prescription received from ${data.doctorName}`,
+      });
+      loadMedicines(); // Refresh inventory
+    });
+    
+    // Listen for medicine taken notifications from patients
+    const unsubscribeMedicine = realtimeService.onMedicineTaken((data) => {
+      console.log('📊 Pharmacy received medicine taken notification:', data);
+      toast({
+        title: '📊 Medicine Dispensed',
+        description: `${data.patientName} took prescribed medicine`,
+      });
+    });
+    
+    return () => {
+      clearInterval(interval);
+      unsubscribePrescription();
+      unsubscribeMedicine();
+    };
   }, []);
 
   const loadMedicines = async () => {
@@ -152,6 +177,14 @@ const PharmacyDashboard = () => {
       const result = await response.json();
       
       if (result.success) {
+        // Notify other components about inventory update
+        realtimeService.notifyInventoryUpdate({
+          medicineId,
+          medicineName: medicines.find(m => m.id === medicineId)?.name || 'Unknown',
+          newStock,
+          pharmacyId
+        });
+        
         toast({
           title: "Stock Updated",
           description: `Medicine stock has been updated to ${newStock} units.`,
@@ -430,17 +463,44 @@ const PharmacyDashboard = () => {
                 <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-2">
-                <Button variant="outline" onClick={() => setShowLowStock(!showLowStock)}>
-                  {showLowStock ? '📋 Show All' : '⚠️ Low Stock'}
+                <Button 
+                  variant="medical" 
+                  onClick={() => {
+                    const addMedicineTab = document.querySelector('[value="add-medicine"]') as HTMLElement;
+                    if (addMedicineTab) addMedicineTab.click();
+                  }}
+                  className="h-16 flex-col space-y-1"
+                >
+                  <Plus className="h-5 w-5" />
+                  <span className="text-xs">Add Medicine</span>
                 </Button>
-                <Button variant="outline" onClick={exportInventory}>
-                  📊 Export CSV
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    const inventoryTab = document.querySelector('[value="inventory"]') as HTMLElement;
+                    if (inventoryTab) inventoryTab.click();
+                    setShowLowStock(true);
+                  }}
+                  className="h-16 flex-col space-y-1"
+                >
+                  <AlertTriangle className="h-5 w-5" />
+                  <span className="text-xs">Low Stock</span>
                 </Button>
-                <Button variant="outline" onClick={() => setSortBy(sortBy === 'stock' ? 'name' : 'stock')}>
-                  🔄 Sort by {sortBy === 'stock' ? 'Name' : 'Stock'}
+                <Button 
+                  variant="success" 
+                  onClick={exportInventory}
+                  className="h-16 flex-col space-y-1"
+                >
+                  <Package className="h-5 w-5" />
+                  <span className="text-xs">Export</span>
                 </Button>
-                <Button variant="outline" onClick={loadMedicines}>
-                  🔄 Refresh All
+                <Button 
+                  variant="secondary" 
+                  onClick={loadMedicines}
+                  className="h-16 flex-col space-y-1"
+                >
+                  <RefreshCw className="h-5 w-5" />
+                  <span className="text-xs">Refresh</span>
                 </Button>
               </CardContent>
             </Card>
