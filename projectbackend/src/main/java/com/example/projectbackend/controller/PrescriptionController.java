@@ -179,13 +179,15 @@ public class PrescriptionController {
             
             System.out.println("💊 Found " + takenPrescriptions.size() + " taken prescriptions for doctor " + doctorId);
             
-            List<Map<String, Object>> notifications = takenPrescriptions.stream().map(p -> Map.of(
-                "prescriptionId", p.getId(),
-                "patientName", p.getPatient().getName(),
-                "patientId", p.getPatient().getId(),
-                "takenAt", p.getTakenAt().toString(),
-                "medicines", p.getMedicines()
-            )).collect(Collectors.toList());
+            List<Map<String, Object>> notifications = takenPrescriptions.stream().map(p -> {
+                Map<String, Object> map = new HashMap<>();
+                map.put("prescriptionId", p.getId());
+                map.put("patientName", p.getPatient().getName());
+                map.put("patientId", p.getPatient().getId());
+                map.put("takenAt", p.getTakenAt().toString());
+                map.put("medicines", p.getMedicines());
+                return map;
+            }).collect(Collectors.toList());
             
             return ResponseEntity.ok(notifications);
         } catch (Exception e) {
