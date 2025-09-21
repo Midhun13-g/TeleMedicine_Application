@@ -154,14 +154,11 @@ public class PrescriptionController {
                 Map<String, Object> map = new HashMap<>();
                 map.put("prescriptionId", p.getId());
                 map.put("patientName", p.getPatient().getName());
-<<<<<<< HEAD
                 map.put("patientId", p.getPatient().getId());
                 map.put("takenAt", p.getTakenAt().toString());
                 map.put("medicines", p.getMedicines());
-=======
                 map.put("medicines", p.getMedicines());
                 map.put("takenAt", p.getTakenAt().toString());
->>>>>>> 358e937bb180700f6349b104620b974116a14809
                 return map;
             }).collect(Collectors.toList());
             
