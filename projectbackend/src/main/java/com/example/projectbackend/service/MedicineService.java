@@ -26,4 +26,29 @@ public class MedicineService {
     public Medicine save(Medicine medicine) {
         return medicineRepository.save(medicine);
     }
+    
+    public List<Medicine> getMedicinesByPharmacy(Long pharmacyId) {
+        return medicineRepository.findByPharmacyId(pharmacyId);
+    }
+    
+    public List<Medicine> getLowStockMedicines(Long pharmacyId) {
+        return medicineRepository.findLowStockMedicines(pharmacyId);
+    }
+    
+    public Medicine updateStock(Long medicineId, Integer newStock) {
+        Medicine medicine = medicineRepository.findById(medicineId)
+            .orElseThrow(() -> new RuntimeException("Medicine not found"));
+        medicine.setStock(newStock);
+        medicine.setAvailable(newStock > 0);
+        return medicineRepository.save(medicine);
+    }
+    
+    public void deleteMedicine(Long medicineId) {
+        medicineRepository.deleteById(medicineId);
+    }
+    
+    public Medicine findById(Long id) {
+        return medicineRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Medicine not found"));
+    }
 }

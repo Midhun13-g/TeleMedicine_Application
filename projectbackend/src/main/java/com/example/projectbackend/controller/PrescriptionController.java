@@ -70,8 +70,8 @@ public class PrescriptionController {
     }
     
     @GetMapping("/patient/{patientId}")
-    public ResponseEntity<List<Map<String, Object>>> getPatientPrescriptions(@PathVariable Long patientId) {
-        User patient = userService.findById(patientId);
+    public ResponseEntity<List<Map<String, Object>>> getPatientPrescriptions(@PathVariable String patientId) {
+        User patient = userService.findById(Long.valueOf(patientId));
         if (patient == null) {
             return ResponseEntity.badRequest().build();
         }
@@ -95,9 +95,9 @@ public class PrescriptionController {
     }
     
     @PostMapping("/{prescriptionId}/mark-taken")
-    public ResponseEntity<Map<String, Object>> markAsTaken(@PathVariable Long prescriptionId) {
+    public ResponseEntity<Map<String, Object>> markAsTaken(@PathVariable String prescriptionId) {
         try {
-            Prescription prescription = prescriptionRepository.findById(prescriptionId).orElse(null);
+            Prescription prescription = prescriptionRepository.findById(Long.valueOf(prescriptionId)).orElse(null);
             if (prescription == null) {
                 return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
@@ -110,35 +110,6 @@ public class PrescriptionController {
             Prescription saved = prescriptionRepository.save(prescription);
             
             System.out.println("✅ Prescription " + prescriptionId + " marked as taken by patient " + prescription.getPatient().getName());
-            System.out.println("  - Status after save: " + saved.getStatus());
-            System.out.println("  - TakenAt after save: " + saved.getTakenAt());
-            System.out.println("  - Doctor ID: " + saved.getDoctor().getId());
-            
-            // Notify doctor via call server
-            try {
-                Map<String, Object> notification = Map.of(
-                    "patientId", prescription.getPatient().getId().toString(),
-                    "patientName", prescription.getPatient().getName(),
-                    "doctorId", prescription.getDoctor().getId().toString(),
-                    "prescriptionId", prescriptionId.toString(),
-                    "takenAt", prescription.getTakenAt().toString()
-                );
-                
-                // Send to call server
-                java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
-                java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
-                    .uri(java.net.URI.create("http://localhost:5002/api/medicine/taken"))
-                    .header("Content-Type", "application/json")
-                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(
-                        new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(notification)
-                    ))
-                    .build();
-                    
-                client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
-                System.out.println("📡 Notified doctor about medicine taken");
-            } catch (Exception e) {
-                System.err.println("Failed to notify doctor: " + e.getMessage());
-            }
             
             return ResponseEntity.ok(Map.of(
                 "success", true,
@@ -157,7 +128,7 @@ public class PrescriptionController {
     }
     
     @GetMapping("/taken-notifications/{doctorId}")
-    public ResponseEntity<List<Map<String, Object>>> getTakenNotifications(@PathVariable Long doctorId) {
+    public ResponseEntity<List<Map<String, Object>>> getTakenNotifications(@PathVariable String doctorId) {
         try {
             System.out.println("🔍 Checking taken notifications for doctor ID: " + doctorId);
             
@@ -179,33 +150,19 @@ public class PrescriptionController {
             
             System.out.println("💊 Found " + takenPrescriptions.size() + " taken prescriptions for doctor " + doctorId);
             
-            List<Map<String, Object>> notifications = takenPrescriptions.stream().map(p -> Map.of(
-                "prescriptionId", p.getId(),
-                "patientName", p.getPatient().getName(),
-                "patientId", p.getPatient().getId(),
-                "takenAt", p.getTakenAt().toString(),
-                "medicines", p.getMedicines()
-            )).collect(Collectors.toList());
+            List<Map<String, Object>> notifications = takenPrescriptions.stream().map(p -> {
+                Map<String, Object> map = new HashMap<>();
+                map.put("prescriptionId", p.getId());
+                map.put("patientName", p.getPatient().getName());
+                map.put("medicines", p.getMedicines());
+                map.put("takenAt", p.getTakenAt().toString());
+                return map;
+            }).collect(Collectors.toList());
             
             return ResponseEntity.ok(notifications);
         } catch (Exception e) {
-            System.err.println("❌ Error in getTakenNotifications: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("Error getting taken notifications: " + e.getMessage());
             return ResponseEntity.badRequest().build();
         }
-    }
-    
-    @GetMapping("/debug/users")
-    public ResponseEntity<Map<String, Object>> debugUsers() {
-        List<User> allUsers = userService.getAllUsers();
-        Map<String, Object> debug = new HashMap<>();
-        debug.put("totalUsers", allUsers.size());
-        debug.put("users", allUsers.stream().map(u -> Map.of(
-            "id", u.getId(),
-            "name", u.getName(),
-            "email", u.getEmail(),
-            "role", u.getRole().toString()
-        )).collect(Collectors.toList()));
-        return ResponseEntity.ok(debug);
     }
 }

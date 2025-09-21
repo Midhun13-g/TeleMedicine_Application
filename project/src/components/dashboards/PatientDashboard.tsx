@@ -18,6 +18,7 @@ import { callService } from '@/services/callService';
 import { medicineService, type Medicine } from '@/services/medicineService';
 import { pharmacyService, type Pharmacy } from '@/services/pharmacyService';
 import { prescriptionService, type Prescription } from '@/services/prescriptionService';
+import MedicineSearch from '@/components/MedicineSearch';
 import io from 'socket.io-client';
 
 const PatientDashboard = () => {
@@ -629,11 +630,12 @@ const PatientDashboard = () => {
       </Card>
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">{t('overview')}</TabsTrigger>
           <TabsTrigger value="symptoms">{t('symptoms')}</TabsTrigger>
           <TabsTrigger value="appointments">{t('appointments')}</TabsTrigger>
           <TabsTrigger value="medicines">{t('medicines')}</TabsTrigger>
+          <TabsTrigger value="search">Search Medicines</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -1449,6 +1451,9 @@ const PatientDashboard = () => {
           </Card>
         </TabsContent>
 
+        <TabsContent value="search" className="space-y-4">
+          <MedicineSearch />
+        </TabsContent>
 
       </Tabs>
 
