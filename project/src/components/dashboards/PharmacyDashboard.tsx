@@ -215,7 +215,15 @@ const PharmacyDashboard = () => {
   const outOfStockCount = medicines.filter(med => med.stock === 0).length;
   const totalMedicines = medicines.length;
   const totalValue = medicines.reduce((sum, med) => sum + (med.price * med.stock), 0);
-  const categories = [...new Set(medicines.map(med => med.category).filter(Boolean))];
+  // Enhanced categories with predefined list
+  const predefinedCategories = [
+    'Pain Relief', 'Antibiotics', 'Vitamins', 'Diabetes', 'Heart Disease',
+    'Blood Pressure', 'Respiratory', 'Digestive', 'Skin Care', 'Eye Care',
+    'Mental Health', 'Allergy', 'Cold & Flu', 'Fever', 'Infection',
+    'Supplements', 'First Aid', 'Women Health', 'Child Care', 'Elderly Care'
+  ];
+  const existingCategories = [...new Set(medicines.map(med => med.category).filter(Boolean))];
+  const categories = [...new Set([...predefinedCategories, ...existingCategories])].sort();
 
   const filteredMedicines = medicines
     .filter(med => {
@@ -268,33 +276,54 @@ const PharmacyDashboard = () => {
       return;
     }
     
+    if (!bulkUpdate.priceIncrease && !bulkUpdate.stockIncrease) {
+      toast({ title: "Error", description: "Please specify price or stock changes", variant: "destructive" });
+      return;
+    }
+    
     const categoryMedicines = medicines.filter(med => med.category === bulkUpdate.category);
     let updated = 0;
+    let errors = 0;
+    
+    toast({ title: "Processing...", description: `Updating ${categoryMedicines.length} medicines...` });
     
     for (const medicine of categoryMedicines) {
       try {
-        const updates: any = {};
+        const updates: any = { ...medicine };
+        
         if (bulkUpdate.priceIncrease) {
-          updates.price = medicine.price * (1 + parseFloat(bulkUpdate.priceIncrease) / 100);
-        }
-        if (bulkUpdate.stockIncrease) {
-          updates.stock = medicine.stock + parseInt(bulkUpdate.stockIncrease);
+          const priceChange = parseFloat(bulkUpdate.priceIncrease) / 100;
+          updates.price = Math.round((medicine.price * (1 + priceChange)) * 100) / 100;
         }
         
-        if (Object.keys(updates).length > 0) {
-          await fetch(`http://localhost:8080/api/medicines/update/${medicine.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...medicine, ...updates })
-          });
+        if (bulkUpdate.stockIncrease) {
+          updates.stock = Math.max(0, medicine.stock + parseInt(bulkUpdate.stockIncrease));
+          updates.available = updates.stock > 0;
+        }
+        
+        const response = await fetch(`http://localhost:8080/api/medicines/update/${medicine.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates)
+        });
+        
+        if (response.ok) {
           updated++;
+        } else {
+          errors++;
         }
       } catch (error) {
         console.error('Bulk update error:', error);
+        errors++;
       }
     }
     
-    toast({ title: "Bulk Update Complete", description: `Updated ${updated} medicines` });
+    toast({ 
+      title: "Bulk Update Complete", 
+      description: `✅ Updated ${updated} medicines${errors > 0 ? `, ${errors} errors` : ''}`,
+      variant: errors > 0 ? "destructive" : "default"
+    });
+    
     setBulkUpdate({ category: '', priceIncrease: '', stockIncrease: '' });
     loadMedicines();
   };
@@ -602,11 +631,16 @@ const PharmacyDashboard = () => {
 
                 <div>
                   <label className="block text-sm font-medium mb-2">Category</label>
-                  <Input
-                    placeholder="e.g., Pain Relief"
+                  <select
                     value={newMedicine.category}
                     onChange={(e) => setNewMedicine(prev => ({ ...prev, category: e.target.value }))}
-                  />
+                    className="w-full px-3 py-2 border rounded-md"
+                  >
+                    <option value="">Select category...</option>
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -632,18 +666,85 @@ const PharmacyDashboard = () => {
 
                 <div>
                   <label className="block text-sm font-medium mb-2">Manufacturer</label>
-                  <Input
-                    placeholder="e.g., Sun Pharma"
+                  <select
                     value={newMedicine.manufacturer}
                     onChange={(e) => setNewMedicine(prev => ({ ...prev, manufacturer: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-md"
+                  >
+                    <option value="">Select manufacturer...</option>
+                    <option value="Sun Pharma">Sun Pharma</option>
+                    <option value="Cipla">Cipla</option>
+                    <option value="Dr. Reddy's">Dr. Reddy's</option>
+                    <option value="Lupin">Lupin</option>
+                    <option value="Aurobindo">Aurobindo</option>
+                    <option value="Torrent">Torrent</option>
+                    <option value="Zydus Cadila">Zydus Cadila</option>
+                    <option value="Glenmark">Glenmark</option>
+                    <option value="Alkem">Alkem</option>
+                    <option value="Abbott">Abbott</option>
+                    <option value="Pfizer">Pfizer</option>
+                    <option value="GSK">GSK</option>
+                    <option value="Novartis">Novartis</option>
+                    <option value="Sanofi">Sanofi</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Minimum Stock Level</label>
+                  <Input
+                    type="number"
+                    placeholder="e.g., 10"
+                    value={newMedicine.minStockLevel}
+                    onChange={(e) => setNewMedicine(prev => ({ ...prev, minStockLevel: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Dosage/Strength</label>
+                  <Input
+                    placeholder="e.g., 500mg, 10ml"
+                    value={newMedicine.dosage}
+                    onChange={(e) => setNewMedicine(prev => ({ ...prev, dosage: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Expiry Date</label>
+                  <Input
+                    type="date"
+                    value={newMedicine.expiryDate}
+                    onChange={(e) => setNewMedicine(prev => ({ ...prev, expiryDate: e.target.value }))}
                   />
                 </div>
               </div>
 
-              <Button onClick={handleAddMedicine} className="w-full">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Medicine to Inventory
-              </Button>
+              <div>
+                <label className="block text-sm font-medium mb-2">Description</label>
+                <textarea
+                  className="w-full px-3 py-2 border rounded-md"
+                  rows={3}
+                  placeholder="Brief description of the medicine..."
+                  value={newMedicine.description}
+                  onChange={(e) => setNewMedicine(prev => ({ ...prev, description: e.target.value }))}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button onClick={handleAddMedicine} className="flex-1">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Medicine to Inventory
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setNewMedicine({
+                    name: '', stock: '', price: '', manufacturer: '', category: '',
+                    description: '', dosage: '', expiryDate: '', minStockLevel: '10'
+                  })}
+                >
+                  🔄 Clear Form
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -652,45 +753,164 @@ const PharmacyDashboard = () => {
           <Card>
             <CardHeader>
               <CardTitle>Bulk Actions</CardTitle>
-              <CardDescription>Update multiple medicines at once</CardDescription>
+              <CardDescription>Update multiple medicines at once by category</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Select Category</label>
-                  <select
-                    value={bulkUpdate.category}
-                    onChange={(e) => setBulkUpdate(prev => ({ ...prev, category: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-md"
-                  >
-                    <option value="">Choose category...</option>
-                    {categories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
+            <CardContent className="space-y-6">
+              {/* Category Selection */}
+              <div className="p-4 bg-blue-50 rounded-lg">
+                <h3 className="font-medium mb-3">Step 1: Select Category</h3>
+                <select
+                  value={bulkUpdate.category}
+                  onChange={(e) => setBulkUpdate(prev => ({ ...prev, category: e.target.value }))}
+                  className="w-full px-3 py-2 border rounded-md"
+                >
+                  <option value="">Choose category to update...</option>
+                  {categories.filter(cat => medicines.some(med => med.category === cat)).map(cat => {
+                    const count = medicines.filter(med => med.category === cat).length;
+                    return (
+                      <option key={cat} value={cat}>{cat} ({count} medicines)</option>
+                    );
+                  })}
+                </select>
+                {bulkUpdate.category && (
+                  <div className="mt-2 p-2 bg-white rounded border">
+                    <p className="text-sm text-gray-600">
+                      Selected: <strong>{bulkUpdate.category}</strong> - 
+                      {medicines.filter(med => med.category === bulkUpdate.category).length} medicines will be updated
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {medicines.filter(med => med.category === bulkUpdate.category).slice(0, 5).map(med => (
+                        <Badge key={med.id} variant="outline" className="text-xs">{med.name}</Badge>
+                      ))}
+                      {medicines.filter(med => med.category === bulkUpdate.category).length > 5 && (
+                        <Badge variant="secondary" className="text-xs">
+                          +{medicines.filter(med => med.category === bulkUpdate.category).length - 5} more
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Bulk Update Options */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="p-4 border rounded-lg">
+                  <h3 className="font-medium mb-3">💰 Price Updates</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Price Increase (%)</label>
+                      <Input
+                        type="number"
+                        placeholder="e.g., 10 for 10% increase"
+                        value={bulkUpdate.priceIncrease}
+                        onChange={(e) => setBulkUpdate(prev => ({ ...prev, priceIncrease: e.target.value }))}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Enter positive number to increase, negative to decrease</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setBulkUpdate(prev => ({ ...prev, priceIncrease: '5' }))}>
+                        +5%
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setBulkUpdate(prev => ({ ...prev, priceIncrease: '10' }))}>
+                        +10%
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setBulkUpdate(prev => ({ ...prev, priceIncrease: '15' }))}>
+                        +15%
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Price Increase (%)</label>
-                  <Input
-                    type="number"
-                    placeholder="e.g., 10"
-                    value={bulkUpdate.priceIncrease}
-                    onChange={(e) => setBulkUpdate(prev => ({ ...prev, priceIncrease: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Stock Increase</label>
-                  <Input
-                    type="number"
-                    placeholder="e.g., 50"
-                    value={bulkUpdate.stockIncrease}
-                    onChange={(e) => setBulkUpdate(prev => ({ ...prev, stockIncrease: e.target.value }))}
-                  />
+
+                <div className="p-4 border rounded-lg">
+                  <h3 className="font-medium mb-3">📦 Stock Updates</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Stock Increase (Units)</label>
+                      <Input
+                        type="number"
+                        placeholder="e.g., 50 units to add"
+                        value={bulkUpdate.stockIncrease}
+                        onChange={(e) => setBulkUpdate(prev => ({ ...prev, stockIncrease: e.target.value }))}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Enter positive number to add stock</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setBulkUpdate(prev => ({ ...prev, stockIncrease: '25' }))}>
+                        +25
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setBulkUpdate(prev => ({ ...prev, stockIncrease: '50' }))}>
+                        +50
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setBulkUpdate(prev => ({ ...prev, stockIncrease: '100' }))}>
+                        +100
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <Button onClick={handleBulkUpdate} className="w-full">
-                Apply Bulk Update
-              </Button>
+
+              {/* Preview and Apply */}
+              {bulkUpdate.category && (bulkUpdate.priceIncrease || bulkUpdate.stockIncrease) && (
+                <div className="p-4 bg-yellow-50 rounded-lg">
+                  <h3 className="font-medium mb-2">📋 Preview Changes</h3>
+                  <div className="text-sm space-y-1">
+                    <p>Category: <strong>{bulkUpdate.category}</strong></p>
+                    <p>Medicines affected: <strong>{medicines.filter(med => med.category === bulkUpdate.category).length}</strong></p>
+                    {bulkUpdate.priceIncrease && (
+                      <p>Price change: <strong>{bulkUpdate.priceIncrease > 0 ? '+' : ''}{bulkUpdate.priceIncrease}%</strong></p>
+                    )}
+                    {bulkUpdate.stockIncrease && (
+                      <p>Stock increase: <strong>+{bulkUpdate.stockIncrease} units per medicine</strong></p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleBulkUpdate} 
+                  className="flex-1"
+                  disabled={!bulkUpdate.category || (!bulkUpdate.priceIncrease && !bulkUpdate.stockIncrease)}
+                >
+                  🚀 Apply Bulk Update
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setBulkUpdate({ category: '', priceIncrease: '', stockIncrease: '' })}
+                >
+                  🔄 Reset
+                </Button>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="border-t pt-4">
+                <h3 className="font-medium mb-3">⚡ Quick Actions</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <Button size="sm" variant="outline" onClick={() => {
+                    const lowStockMeds = medicines.filter(med => med.stock < 10);
+                    if (lowStockMeds.length > 0) {
+                      setBulkUpdate({ category: lowStockMeds[0].category, priceIncrease: '', stockIncrease: '50' });
+                    }
+                  }}>
+                    🔄 Restock Low
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => {
+                    setBulkUpdate({ category: categories[0], priceIncrease: '10', stockIncrease: '' });
+                  }}>
+                    💰 Price +10%
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => {
+                    setBulkUpdate({ category: categories[0], priceIncrease: '', stockIncrease: '25' });
+                  }}>
+                    📦 Stock +25
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => {
+                    setBulkUpdate({ category: categories[0], priceIncrease: '5', stockIncrease: '50' });
+                  }}>
+                    🔥 Both +5%/+50
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
