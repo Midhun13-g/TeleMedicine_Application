@@ -235,14 +235,22 @@ const AppointmentBooking: React.FC<AppointmentBookingProps> = ({ onClose, isInst
                 <SelectValue placeholder="Select time" />
               </SelectTrigger>
               <SelectContent>
-                {availableSlots.map((slot) => (
-                  <SelectItem key={slot} value={slot}>
-                    <div className="flex items-center space-x-2">
-                      <Clock className="h-4 w-4" />
-                      <span>{slot}</span>
-                    </div>
-                  </SelectItem>
-                ))}
+                {availableSlots.map((slot) => {
+                  const [hours, minutes] = slot.split(':');
+                  const hour12 = new Date(`2000-01-01T${slot}:00`).toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                  });
+                  return (
+                    <SelectItem key={slot} value={slot}>
+                      <div className="flex items-center space-x-2">
+                        <Clock className="h-4 w-4" />
+                        <span>{hour12}</span>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>

@@ -109,6 +109,9 @@ public class AppointmentController {
             appointmentMap.put("doctorName", appointment.getDoctor().getName());
             appointmentMap.put("doctorSpecialization", appointment.getDoctor().getSpecialization());
             appointmentMap.put("appointmentDate", appointment.getAppointmentDate().toString());
+            if (appointment.getTimeSlot() != null) {
+                appointmentMap.put("timeSlot", appointment.getTimeSlot().toString());
+            }
             appointmentMap.put("status", appointment.getStatus().toString().toLowerCase());
             appointmentMap.put("symptoms", appointment.getSymptoms());
             return appointmentMap;

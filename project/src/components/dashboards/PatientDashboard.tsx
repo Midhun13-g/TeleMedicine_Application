@@ -499,7 +499,10 @@ const PatientDashboard = () => {
         consultationId,
         doctorId,
         patientId: user?.id,
-        patientInfo: { name: user?.name || 'Patient' },
+        patientInfo: { 
+          id: user?.id,
+          name: user?.name || 'Patient' 
+        },
         consultationType
       });
       
@@ -1138,7 +1141,20 @@ const PatientDashboard = () => {
                     </div>
                     <div className="flex items-center space-x-1">
                       <Clock className="h-3 w-3" />
-                      <span>{new Date(appointment.appointmentDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span>
+                        {appointment.timeSlot ? 
+                          new Date(`2000-01-01T${appointment.timeSlot}`).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true
+                          }) : 
+                          new Date(appointment.appointmentDate).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true
+                          })
+                        }
+                      </span>
                     </div>
                   </div>
                   {appointment.symptoms && (

@@ -206,9 +206,12 @@ const DoctorDashboard = () => {
     const roomId = isAudioCall ? `audio_room_${consultationId}` : `room_${consultationId}`;
     
     console.log('🩺 Doctor accepting consultation:', consultationId, 'Type:', consultation?.consultationType);
+    console.log('Patient info for consultation:', consultation?.patientInfo);
     
-    // Remove from requests list first
-    setConsultationRequests(prev => prev.filter(req => req.consultationId !== consultationId));
+    // Store patient info for later use in prescription
+    if (consultation?.patientInfo) {
+      console.log('📝 Storing patient info for prescription:', consultation.patientInfo);
+    }
     
     // Notify patient via socket
     if (socket?.connected) {
@@ -223,7 +226,7 @@ const DoctorDashboard = () => {
     
     toast({
       title: 'Call Started',
-      description: `Starting ${isAudioCall ? 'audio' : 'video'} call with patient...`,
+      description: `Starting ${isAudioCall ? 'audio' : 'video'} call with ${consultation?.patientInfo?.name || 'patient'}...`,
     });
   };
   
@@ -374,28 +377,48 @@ const DoctorDashboard = () => {
   };
   
   const handleCallEnd = () => {
+    console.log('📞 Call ended, processing patient info...');
+    console.log('Current call target:', currentCallTarget);
+    console.log('Available consultation requests:', consultationRequests);
+    
     setShowVideoCall(false);
-    setCurrentCallTarget(null);
     
     // Show prescription modal after call ends
     if (currentCallTarget) {
-      // Extract patient info from consultation requests or use default
-      const patientInfo = consultationRequests.find(req => 
-        `room_${req.consultationId}` === currentCallTarget
-      )?.patientInfo || { name: 'Patient', id: '1' };
+      // Extract patient info from consultation requests
+      const matchingRequest = consultationRequests.find(req => 
+        `room_${req.consultationId}` === currentCallTarget ||
+        `audio_room_${req.consultationId}` === currentCallTarget
+      );
       
-      const patientId = patientInfo.id || '1';
+      console.log('Matching consultation request:', matchingRequest);
+      
+      const patientInfo = matchingRequest?.patientInfo || { 
+        name: matchingRequest?.patientId || 'Unknown Patient', 
+        id: matchingRequest?.patientId || '1' 
+      };
+      
+      console.log('Extracted patient info:', patientInfo);
+      
       setCallPatientInfo({
-        id: patientId,
-        name: patientInfo.name || 'Patient'
+        id: String(patientInfo.id),
+        name: patientInfo.name
       });
       setPrescriptionForm({
-        patientId: patientId,
+        patientId: String(patientInfo.id),
         medicines: '',
         notes: ''
       });
       setShowPrescriptionModal(true);
+      
+      // Clear the consultation request after processing
+      setConsultationRequests(prev => prev.filter(req => 
+        `room_${req.consultationId}` !== currentCallTarget &&
+        `audio_room_${req.consultationId}` !== currentCallTarget
+      ));
     }
+    
+    setCurrentCallTarget(null);
   };
 
   const handleProfileUpdate = async () => {
@@ -1112,9 +1135,11 @@ const DoctorDashboard = () => {
                   placeholder="Enter patient ID (e.g., 1, 2, 3)"
                   value={prescriptionForm.patientId}
                   onChange={(e) => setPrescriptionForm(prev => ({ ...prev, patientId: e.target.value }))}
-                  className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                  className="transition-all duration-200 focus:ring-2 focus:ring-primary/20 font-medium"
                 />
-
+                <p className="text-xs text-muted-foreground mt-1">
+                  💡 Tip: Patient ID will be auto-filled after video calls
+                </p>
               </div>
 
               <div>
@@ -1451,7 +1476,7 @@ const DoctorDashboard = () => {
               <CardTitle className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <FileText className="h-5 w-5 text-primary" />
-                  <span>Add Prescription for {callPatientInfo.name}</span>
+                  <span>Add Prescription</span>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => setShowPrescriptionModal(false)}>
                   <X className="h-4 w-4" />
@@ -1462,8 +1487,26 @@ const DoctorDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Patient Information Display */}
+              <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
+                <h4 className="font-semibold text-primary mb-2 flex items-center">
+                  <User className="h-4 w-4 mr-2" />
+                  Patient Information
+                </h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Patient ID:</span>
+                    <div className="font-medium text-lg">{callPatientInfo.id}</div>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Patient Name:</span>
+                    <div className="font-medium text-lg">{callPatientInfo.name}</div>
+                  </div>
+                </div>
+              </div>
+
               <div>
-                <label className="block text-sm font-medium mb-2">Patient ID</label>
+                <label className="block text-sm font-medium mb-2">Patient ID (Editable)</label>
                 <Input
                   value={callPatientInfo.id}
                   onChange={(e) => {
@@ -1471,8 +1514,8 @@ const DoctorDashboard = () => {
                     setPrescriptionForm(prev => ({ ...prev, patientId: e.target.value }));
                   }}
                   placeholder="Patient ID"
+                  className="font-medium"
                 />
-
               </div>
 
               <div>
