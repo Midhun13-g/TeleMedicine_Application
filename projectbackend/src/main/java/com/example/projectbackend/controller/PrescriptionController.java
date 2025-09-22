@@ -154,6 +154,9 @@ public class PrescriptionController {
                 Map<String, Object> map = new HashMap<>();
                 map.put("prescriptionId", p.getId());
                 map.put("patientName", p.getPatient().getName());
+                map.put("patientId", p.getPatient().getId());
+                map.put("takenAt", p.getTakenAt().toString());
+                map.put("medicines", p.getMedicines());
                 map.put("medicines", p.getMedicines());
                 map.put("takenAt", p.getTakenAt().toString());
                 return map;
