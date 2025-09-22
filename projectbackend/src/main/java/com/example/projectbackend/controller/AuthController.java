@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.HashMap;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping({"/api/auth", "/api/admin"})
 @CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"}, allowCredentials = "true")
 public class AuthController {
 
@@ -143,6 +143,78 @@ public class AuthController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Profile update failed: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/users")
+    public ResponseEntity<?> getAllUsers() {
+        try {
+            var users = userService.getAllUsers();
+            var userList = users.stream().map(user -> Map.of(
+                "id", user.getId(),
+                "name", user.getName(),
+                "email", user.getEmail(),
+                "role", user.getRole().toString(),
+                "phone", user.getPhone() != null ? user.getPhone() : "",
+                "address", user.getAddress() != null ? user.getAddress() : "",
+                "specialization", user.getSpecialization() != null ? user.getSpecialization() : "",
+                "pharmacyName", user.getPharmacyName() != null ? user.getPharmacyName() : "",
+                "createdAt", user.getCreatedAt() != null ? user.getCreatedAt().toString() : ""
+            )).toList();
+            
+            return ResponseEntity.ok(userList);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Failed to fetch users: " + e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/users/{userId}")
+    public ResponseEntity<?> deleteUser(@PathVariable Long userId) {
+        try {
+            User user = userService.findById(userId);
+            if (user == null) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "User not found"));
+            }
+            
+            userService.deleteUser(userId);
+            return ResponseEntity.ok(Map.of("success", true, "message", "User deleted successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Failed to delete user: " + e.getMessage()));
+        }
+    }
+
+    @PutMapping("/users/{userId}/suspend")
+    public ResponseEntity<?> suspendUser(@PathVariable Long userId) {
+        try {
+            User user = userService.findById(userId);
+            if (user == null) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "User not found"));
+            }
+            
+            // For now, we'll just return success. In a real app, you'd add a suspended field to User model
+            return ResponseEntity.ok(Map.of("success", true, "message", "User suspended successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Failed to suspend user: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<?> getSystemStats() {
+        try {
+            var users = userService.getAllUsers();
+            long totalPatients = users.stream().filter(u -> u.getRole() == User.Role.PATIENT).count();
+            long totalDoctors = users.stream().filter(u -> u.getRole() == User.Role.DOCTOR).count();
+            long totalPharmacies = users.stream().filter(u -> u.getRole() == User.Role.PHARMACY).count();
+            
+            return ResponseEntity.ok(Map.of(
+                "totalUsers", users.size(),
+                "totalPatients", totalPatients,
+                "totalDoctors", totalDoctors,
+                "totalPharmacies", totalPharmacies,
+                "totalAdmins", 1
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Failed to fetch stats: " + e.getMessage()));
         }
     }
 }

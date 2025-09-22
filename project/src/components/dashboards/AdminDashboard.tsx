@@ -76,6 +76,64 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleSuspendUser = async (userId: number, userName: string) => {
+    if (!confirm(`Are you sure you want to suspend ${userName}?`)) return;
+    
+    try {
+      const response = await fetch(`http://localhost:8080/api/admin/users/${userId}/suspend`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (response.ok) {
+        toast({
+          title: 'User Suspended',
+          description: `${userName} has been suspended successfully`,
+        });
+        loadSystemData();
+      } else {
+        throw new Error('Failed to suspend user');
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to suspend user',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleDeleteUser = async (userId: number, userName: string) => {
+    if (!confirm(`Are you sure you want to permanently delete ${userName}? This action cannot be undone.`)) return;
+    
+    try {
+      const response = await fetch(`http://localhost:8080/api/admin/users/${userId}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        toast({
+          title: 'User Deleted',
+          description: `${userName} has been deleted successfully`,
+        });
+        setSystemUsers(prev => prev.filter(user => user.id !== userId));
+        // Update stats
+        setSystemStats(prev => ({
+          ...prev,
+          totalUsers: prev.totalUsers - 1
+        }));
+      } else {
+        throw new Error('Failed to delete user');
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete user',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const exportCSV = () => {
     toast({
       title: "Export Started",
@@ -242,16 +300,17 @@ const AdminDashboard = () => {
                     <TableHead>Role</TableHead>
                     <TableHead>Location</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center">Loading users...</TableCell>
+                      <TableCell colSpan={6} className="text-center">Loading users...</TableCell>
                     </TableRow>
                   ) : systemUsers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center">No users found</TableCell>
+                      <TableCell colSpan={6} className="text-center">No users found</TableCell>
                     </TableRow>
                   ) : (
                     systemUsers.map((user) => (
@@ -270,6 +329,24 @@ const AdminDashboard = () => {
                         <TableCell>{user.address || user.specialization || user.pharmacyName || 'N/A'}</TableCell>
                         <TableCell>
                           <Badge variant="default">Active</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleSuspendUser(user.id, user.name)}
+                            >
+                              Suspend
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDeleteUser(user.id, user.name)}
+                            >
+                              Delete
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))

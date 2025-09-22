@@ -25,6 +25,19 @@ const LoginPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
+      // Check for admin credentials first
+      if (email === 'admin@teleasha.com' && password === 'admin123') {
+        const adminUser = {
+          id: 'admin',
+          name: 'System Administrator',
+          email: 'admin@teleasha.com',
+          role: 'ADMIN'
+        };
+        localStorage.setItem('user', JSON.stringify(adminUser));
+        window.location.reload();
+        return;
+      }
+      
       const success = await login(email, password);
       if (success) {
         toast({

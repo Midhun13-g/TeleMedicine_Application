@@ -15,12 +15,16 @@ const Index = () => {
 
   const renderDashboard = () => {
     switch (user?.role) {
+      case 'PATIENT':
       case 'patient':
         return <PatientDashboard />;
+      case 'DOCTOR':
       case 'doctor':
         return <DoctorDashboard />;
+      case 'PHARMACY':
       case 'pharmacy':
         return <PharmacyDashboard />;
+      case 'ADMIN':
       case 'admin':
         return <AdminDashboard />;
       default:
