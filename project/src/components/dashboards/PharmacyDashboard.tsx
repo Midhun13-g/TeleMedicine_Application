@@ -31,6 +31,7 @@ const PharmacyDashboard = () => {
   const [filterCategory, setFilterCategory] = useState('all');
   const [sortBy, setSortBy] = useState('name');
   const [showLowStock, setShowLowStock] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
   const [newMedicine, setNewMedicine] = useState({
     name: '',
     stock: '',
@@ -430,7 +431,7 @@ const PharmacyDashboard = () => {
         </div>
       )}
 
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="inventory">Inventory</TabsTrigger>
@@ -494,19 +495,7 @@ const PharmacyDashboard = () => {
               <CardContent className="grid grid-cols-2 gap-2">
                 <Button 
                   variant="medical" 
-                  onClick={() => {
-                    const addMedicineTab = document.querySelector('[data-state="inactive"][value="add-medicine"]') as HTMLElement;
-                    if (addMedicineTab) {
-                      addMedicineTab.click();
-                    } else {
-                      // Fallback: try different selector
-                      const allTabs = document.querySelectorAll('[role="tab"]');
-                      const addTab = Array.from(allTabs).find(tab => 
-                        tab.textContent?.toLowerCase().includes('add medicine')
-                      ) as HTMLElement;
-                      if (addTab) addTab.click();
-                    }
-                  }}
+                  onClick={() => setActiveTab('add-medicine')}
                   className="h-16 flex-col space-y-1"
                 >
                   <Plus className="h-5 w-5" />
@@ -515,17 +504,8 @@ const PharmacyDashboard = () => {
                 <Button 
                   variant="outline" 
                   onClick={() => {
-                    const inventoryTab = document.querySelector('[data-state="inactive"][value="inventory"]') as HTMLElement;
-                    if (inventoryTab) {
-                      inventoryTab.click();
-                    } else {
-                      const allTabs = document.querySelectorAll('[role="tab"]');
-                      const invTab = Array.from(allTabs).find(tab => 
-                        tab.textContent?.toLowerCase().includes('inventory')
-                      ) as HTMLElement;
-                      if (invTab) invTab.click();
-                    }
-                    setTimeout(() => setShowLowStock(true), 100);
+                    setActiveTab('inventory');
+                    setShowLowStock(true);
                   }}
                   className="h-16 flex-col space-y-1"
                 >
