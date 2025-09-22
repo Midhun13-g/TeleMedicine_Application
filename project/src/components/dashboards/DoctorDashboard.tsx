@@ -65,10 +65,36 @@ const DoctorDashboard = () => {
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
   const [callPatientInfo, setCallPatientInfo] = useState<{id: string, name: string} | null>(null);
   const [lastCheckedNotifications, setLastCheckedNotifications] = useState<string[]>([]);
+  const [appointmentFilter, setAppointmentFilter] = useState('all');
 
-  const doctorAppointments = mockAppointments.filter(apt => apt.doctorId === user?.id);
+  const [doctorAppointments, setDoctorAppointments] = useState<any[]>([]);
   const pendingCount = doctorAppointments.filter(apt => apt.status === 'pending').length;
   const approvedCount = doctorAppointments.filter(apt => apt.status === 'approved').length;
+  
+  // Load doctor appointments
+  const loadDoctorAppointments = async () => {
+    if (user?.id) {
+      try {
+        const response = await fetch(`http://localhost:8080/api/appointments/doctor/${user.id}`);
+        if (response.ok) {
+          const appointments = await response.json();
+          setDoctorAppointments(appointments);
+        }
+      } catch (error) {
+        console.error('Failed to load appointments:', error);
+      }
+    }
+  };
+  
+  useEffect(() => {
+    loadDoctorAppointments();
+    
+    const interval = setInterval(() => {
+      loadDoctorAppointments();
+    }, 3000);
+    
+    return () => clearInterval(interval);
+  }, [user?.id]);
   
   // Initialize socket connection and doctor presence
   useEffect(() => {
@@ -925,82 +951,135 @@ const DoctorDashboard = () => {
             <CardHeader>
               <CardTitle>{t('appointmentRequests')}</CardTitle>
               <CardDescription>{t('manageAppointments')}</CardDescription>
+              <div className="flex flex-wrap gap-2 mt-4">
+                <span className="text-sm font-medium text-muted-foreground self-center">Filter:</span>
+                {['all', 'pending', 'approved', 'cancelled'].map((filter) => (
+                  <Button
+                    key={filter}
+                    variant={appointmentFilter === filter ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setAppointmentFilter(filter)}
+                  >
+                    {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                  </Button>
+                ))}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {doctorAppointments.map((appointment) => (
-                <div key={appointment.id} className="border border-border rounded-lg p-4 space-y-3 hover:shadow-card transition-shadow duration-200">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <User className="h-4 w-4 text-success" />
-                      <span className="font-medium">{appointment.patientName}</span>
-                      <Badge variant="outline" className="text-xs">
-                        New {t('patient')}
+              {doctorAppointments.length === 0 ? (
+                <div className="text-center py-8">
+                  <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-2">No appointments found</p>
+                  <p className="text-sm text-muted-foreground">Appointments from patients will appear here</p>
+                </div>
+              ) : (
+                doctorAppointments
+                  .filter(appointment => appointmentFilter === 'all' || appointment.status === appointmentFilter)
+                  .map((appointment) => (
+                  <div key={appointment.id} className="border border-border rounded-lg p-4 space-y-3 hover:shadow-card transition-shadow duration-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <User className="h-4 w-4 text-success" />
+                        <span className="font-medium">{appointment.patientName}</span>
+                        <Badge variant="outline" className="text-xs">
+                          ID: {appointment.patientId}
+                        </Badge>
+                      </div>
+                      <Badge variant={
+                        appointment.status === 'pending' ? 'secondary' :
+                        appointment.status === 'approved' ? 'default' : 'outline'
+                      } className="animate-pulse-glow">
+                        {appointment.status}
                       </Badge>
                     </div>
-                    <Badge variant={
-                      appointment.status === 'pending' ? 'secondary' :
-                      appointment.status === 'approved' ? 'default' : 'outline'
-                    } className="animate-pulse-glow">
-                      {t(appointment.status)}
-                    </Badge>
-                  </div>
-                  
-                  <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                    <div className="flex items-center space-x-1">
-                      <Calendar className="h-3 w-3" />
-                      <span>{appointment.date}</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <Clock className="h-3 w-3" />
-                      <span>{appointment.time}</span>
-                    </div>
-                  </div>
-
-                  {appointment.symptoms && (
-                    <div className="bg-muted/50 p-3 rounded text-sm border-l-4 border-primary">
-                      <strong>{t('symptoms')}:</strong> {appointment.symptoms}
-                    </div>
-                  )}
-
-                  {appointment.status === 'pending' && (
-                    <div className="flex space-x-2">
-                      <Button 
-                        size="sm" 
-                        variant="success"
-                        className="hover:scale-105 transition-transform"
-                        onClick={() => handleApproveAppointment(appointment.id)}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        {t('approve')}
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="destructive"
-                        className="hover:scale-105 transition-transform"
-                        onClick={() => handleRejectAppointment(appointment.id)}
-                      >
-                        <XCircle className="h-4 w-4 mr-1" />
-                        {t('reject')}
-                      </Button>
-                    </div>
-                  )}
-
-                  {appointment.status === 'approved' && (
-                    <Button 
-                      size="sm" 
-                      variant="medical"
-                      className="hover:scale-105 transition-transform"
-                      onClick={() => startVideoAudioCall(appointment.id)}
-                    >
-                      <div className="flex items-center space-x-1 mr-1">
-                        <Video className="h-3 w-3" />
-                        <AudioLines className="h-3 w-3" />
+                    
+                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                      <div className="flex items-center space-x-1">
+                        <Calendar className="h-3 w-3" />
+                        <span>{appointment.appointmentDate}</span>
                       </div>
-                      {t('startConsultation')}
-                    </Button>
-                  )}
-                </div>
-              ))}
+                      {appointment.timeSlot && (
+                        <div className="flex items-center space-x-1">
+                          <Clock className="h-3 w-3" />
+                          <span>{appointment.timeSlot}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {appointment.symptoms && (
+                      <div className="bg-muted/50 p-3 rounded text-sm border-l-4 border-primary">
+                        <strong>{t('symptoms')}:</strong> {appointment.symptoms}
+                      </div>
+                    )}
+
+                    {appointment.status === 'pending' && (
+                      <div className="flex space-x-2">
+                        <Button 
+                          size="sm" 
+                          variant="success"
+                          className="hover:scale-105 transition-transform"
+                          onClick={async () => {
+                            try {
+                              const response = await fetch(`http://localhost:8080/api/appointments/${appointment.id}/status`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ status: 'approved' })
+                              });
+                              if (response.ok) {
+                                loadDoctorAppointments();
+                                toast({ title: 'Appointment Approved', description: 'Patient has been notified' });
+                              }
+                            } catch (error) {
+                              toast({ title: 'Error', description: 'Failed to approve appointment', variant: 'destructive' });
+                            }
+                          }}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                          {t('approve')}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="destructive"
+                          className="hover:scale-105 transition-transform"
+                          onClick={async () => {
+                            try {
+                              const response = await fetch(`http://localhost:8080/api/appointments/${appointment.id}/status`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ status: 'cancelled' })
+                              });
+                              if (response.ok) {
+                                loadDoctorAppointments();
+                                toast({ title: 'Appointment Rejected', description: 'Patient has been notified', variant: 'destructive' });
+                              }
+                            } catch (error) {
+                              toast({ title: 'Error', description: 'Failed to reject appointment', variant: 'destructive' });
+                            }
+                          }}
+                        >
+                          <XCircle className="h-4 w-4 mr-1" />
+                          {t('reject')}
+                        </Button>
+                      </div>
+                    )}
+
+                    {appointment.status === 'approved' && (
+                      <Button 
+                        size="sm" 
+                        variant="medical"
+                        className="hover:scale-105 transition-transform"
+                        onClick={() => startVideoAudioCall(appointment.id)}
+                      >
+                        <div className="flex items-center space-x-1 mr-1">
+                          <Video className="h-3 w-3" />
+                          <AudioLines className="h-3 w-3" />
+                        </div>
+                        {t('startConsultation')}
+                      </Button>
+                    )}
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1081,9 +1160,9 @@ const DoctorDashboard = () => {
                 <Button 
                   onClick={async () => {
                     try {
-                      const response = await fetch('http://localhost:8080/api/prescriptions/debug/users');
+                      const response = await fetch('http://localhost:8080/api/appointments/debug/all');
                       const data = await response.json();
-                      console.log('Available users:', data);
+                      console.log('Debug info:', data);
                       toast({
                         title: 'Debug Info',
                         description: `Found ${data.totalUsers} users. Check console for details.`,
@@ -1091,7 +1170,7 @@ const DoctorDashboard = () => {
                     } catch (error) {
                       toast({
                         title: 'Debug Error',
-                        description: 'Failed to fetch users',
+                        description: 'Failed to connect to backend',
                         variant: 'destructive'
                       });
                     }
@@ -1099,7 +1178,31 @@ const DoctorDashboard = () => {
                   variant="ghost"
                   size="sm"
                 >
-                  🔍 Check Users
+                  🔍 Check Backend
+                </Button>
+                <Button 
+                  onClick={async () => {
+                    try {
+                      const response = await fetch(`http://localhost:8080/api/appointments/doctor/${user?.id}`);
+                      if (response.ok) {
+                        const appointments = await response.json();
+                        console.log('Doctor appointments:', appointments);
+                        toast({
+                          title: 'Appointments Check',
+                          description: `Found ${appointments.length} appointments for this doctor`,
+                        });
+                        loadDoctorAppointments();
+                      } else {
+                        toast({ title: 'Error', description: `Failed: ${response.status}`, variant: 'destructive' });
+                      }
+                    } catch (error) {
+                      toast({ title: 'Error', description: 'Failed to check appointments', variant: 'destructive' });
+                    }
+                  }}
+                  variant="ghost"
+                  size="sm"
+                >
+                  📅 Refresh Appointments
                 </Button>
                 <Button 
                   onClick={async () => {

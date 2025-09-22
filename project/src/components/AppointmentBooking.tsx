@@ -36,8 +36,28 @@ const AppointmentBooking: React.FC<AppointmentBookingProps> = ({ onClose, isInst
   }, [selectedDoctor, selectedDate]);
 
   const loadDoctors = async () => {
-    const doctorList = await appointmentService.getDoctors();
-    setDoctors(doctorList);
+    try {
+      const response = await fetch('http://localhost:8080/api/appointments/doctors');
+      if (response.ok) {
+        const doctorList = await response.json();
+        console.log('Loaded doctors:', doctorList);
+        setDoctors(doctorList);
+      } else {
+        console.error('Failed to load doctors:', response.status);
+        toast({
+          title: "Error",
+          description: "Failed to load doctors",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error loading doctors:', error);
+      toast({
+        title: "Error",
+        description: "Cannot connect to server",
+        variant: "destructive"
+      });
+    }
   };
 
   const loadAvailableSlots = async () => {
@@ -74,16 +94,25 @@ const AppointmentBooking: React.FC<AppointmentBookingProps> = ({ onClose, isInst
       const appointmentDate = `${selectedDate}T${selectedTime}:00`;
       console.log('Formatted appointment date:', appointmentDate);
       
-      const result = await appointmentService.bookAppointment({
-        patientId: parseInt(user.id),
-        doctorId: parseInt(selectedDoctor),
-        appointmentDate,
-        symptoms
+      // Direct API call instead of using service
+      const response = await fetch('http://localhost:8080/api/appointments/book', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          patientId: parseInt(user.id),
+          doctorId: parseInt(selectedDoctor),
+          appointmentDate,
+          symptoms
+        })
       });
-
+      
+      console.log('Response status:', response.status);
+      const result = await response.json();
       console.log('Booking result:', result);
 
-      if (result.success) {
+      if (response.ok && result.success) {
         toast({
           title: "Appointment Booked",
           description: isInstant ? "Instant appointment scheduled!" : "Your appointment has been scheduled successfully",
@@ -100,7 +129,7 @@ const AppointmentBooking: React.FC<AppointmentBookingProps> = ({ onClose, isInst
       console.error('Booking error:', error);
       toast({
         title: "Error",
-        description: "Something went wrong. Please try again.",
+        description: "Cannot connect to server. Please check if backend is running.",
         variant: "destructive"
       });
     } finally {
@@ -235,38 +264,87 @@ const AppointmentBooking: React.FC<AppointmentBookingProps> = ({ onClose, isInst
           />
         </div>
 
-        <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 pt-4">
-          <Button 
-            onClick={handleBooking} 
-            disabled={loading}
-            className={`flex-1 h-12 text-lg font-semibold rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-lg ${
-              isInstant 
-                ? 'bg-gradient-to-r from-warning to-warning/80 hover:from-warning/90 hover:to-warning/70' 
-                : 'bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90'
-            }`}
-          >
-            {loading ? (
-              <div className="flex items-center space-x-2">
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                <span>Booking...</span>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-2">
-                {isInstant ? <Zap className="h-5 w-5" /> : <Calendar className="h-5 w-5" />}
-                <span>{isInstant ? 'Book Instant Appointment' : 'Book Appointment'}</span>
-              </div>
-            )}
-          </Button>
-          
-          {onClose && (
+        <div className="flex flex-col space-y-3 pt-4">
+          <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
             <Button 
-              variant="outline" 
-              onClick={onClose}
-              className="h-12 px-6 border-2 border-border/50 hover:border-primary/50 rounded-xl transition-all duration-300 hover:scale-105"
+              onClick={handleBooking} 
+              disabled={loading}
+              className={`flex-1 h-12 text-lg font-semibold rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-lg ${
+                isInstant 
+                  ? 'bg-gradient-to-r from-warning to-warning/80 hover:from-warning/90 hover:to-warning/70' 
+                  : 'bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90'
+              }`}
             >
-              Cancel
+              {loading ? (
+                <div className="flex items-center space-x-2">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <span>Booking...</span>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  {isInstant ? <Zap className="h-5 w-5" /> : <Calendar className="h-5 w-5" />}
+                  <span>{isInstant ? 'Book Instant Appointment' : 'Book Appointment'}</span>
+                </div>
+              )}
             </Button>
-          )}
+            
+            {onClose && (
+              <Button 
+                variant="outline" 
+                onClick={onClose}
+                className="h-12 px-6 border-2 border-border/50 hover:border-primary/50 rounded-xl transition-all duration-300 hover:scale-105"
+              >
+                Cancel
+              </Button>
+            )}
+          </div>
+          
+          <div className="flex space-x-2">
+            <Button 
+              onClick={async () => {
+                try {
+                  const response = await fetch('http://localhost:8080/api/appointments/debug/all');
+                  const data = await response.json();
+                  console.log('Backend test:', data);
+                  toast({
+                    title: 'Backend Connected',
+                    description: `Found ${data.totalUsers} users in system`,
+                  });
+                } catch (error) {
+                  console.error('Backend test failed:', error);
+                  toast({
+                    title: 'Backend Error',
+                    description: 'Cannot connect to backend server',
+                    variant: 'destructive'
+                  });
+                }
+              }}
+              variant="ghost"
+              size="sm"
+            >
+              🔍 Test Backend
+            </Button>
+            <Button 
+              onClick={() => {
+                console.log('Current form state:', {
+                  selectedDoctor,
+                  selectedDate,
+                  selectedTime,
+                  symptoms,
+                  doctors,
+                  availableSlots
+                });
+                toast({
+                  title: 'Debug Info',
+                  description: 'Check console for form state',
+                });
+              }}
+              variant="ghost"
+              size="sm"
+            >
+              🐛 Debug Form
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

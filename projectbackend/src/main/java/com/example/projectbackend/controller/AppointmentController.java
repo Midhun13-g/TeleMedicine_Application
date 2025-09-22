@@ -44,19 +44,31 @@ public class AppointmentController {
     @PostMapping("/book")
     public ResponseEntity<Map<String, Object>> bookAppointment(@RequestBody Map<String, Object> appointmentData) {
         try {
+            System.out.println("Received appointment booking request: " + appointmentData);
+            
             Long patientId = Long.valueOf(appointmentData.get("patientId").toString());
             Long doctorId = Long.valueOf(appointmentData.get("doctorId").toString());
             String dateTimeStr = (String) appointmentData.get("appointmentDate");
             String symptoms = (String) appointmentData.get("symptoms");
             
+            System.out.println("Parsed data - PatientId: " + patientId + ", DoctorId: " + doctorId + ", DateTime: " + dateTimeStr);
+            
             User patient = userService.findById(patientId);
             User doctor = userService.findById(doctorId);
             
-            if (patient == null || doctor == null) {
-                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid patient or doctor"));
+            System.out.println("Found patient: " + (patient != null ? patient.getName() : "null"));
+            System.out.println("Found doctor: " + (doctor != null ? doctor.getName() : "null"));
+            
+            if (patient == null) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Patient not found with ID: " + patientId));
+            }
+            
+            if (doctor == null) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Doctor not found with ID: " + doctorId));
             }
             
             LocalDateTime appointmentDateTime = LocalDateTime.parse(dateTimeStr, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            System.out.println("Parsed appointment datetime: " + appointmentDateTime);
             
             Appointment appointment = new Appointment();
             appointment.setPatient(patient);
@@ -64,8 +76,12 @@ public class AppointmentController {
             appointment.setAppointmentDate(appointmentDateTime.toLocalDate());
             appointment.setTimeSlot(appointmentDateTime.toLocalTime());
             appointment.setSymptoms(symptoms);
+            appointment.setStatus(Appointment.Status.PENDING);
+            
+            System.out.println("Created appointment object");
             
             Appointment savedAppointment = appointmentService.save(appointment);
+            System.out.println("Saved appointment with ID: " + savedAppointment.getId());
             
             return ResponseEntity.ok(Map.of(
                 "success", true,
@@ -73,6 +89,8 @@ public class AppointmentController {
                 "appointmentId", savedAppointment.getId()
             ));
         } catch (Exception e) {
+            System.err.println("Appointment booking error: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Booking failed: " + e.getMessage()));
         }
     }
@@ -109,12 +127,30 @@ public class AppointmentController {
     }
 
     @GetMapping("/doctor/{doctorId}")
-    public ResponseEntity<List<Appointment>> getDoctorAppointments(@PathVariable Long doctorId) {
+    public ResponseEntity<List<Map<String, Object>>> getDoctorAppointments(@PathVariable Long doctorId) {
         User doctor = userService.findById(doctorId);
         if (doctor == null) {
             return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok(appointmentService.findByDoctor(doctor));
+        
+        List<Appointment> appointments = appointmentService.findByDoctor(doctor);
+        List<Map<String, Object>> appointmentList = appointments.stream().map(appointment -> {
+            Map<String, Object> appointmentMap = new HashMap<>();
+            appointmentMap.put("id", appointment.getId());
+            appointmentMap.put("patientName", appointment.getPatient().getName());
+            appointmentMap.put("patientId", appointment.getPatient().getId());
+            appointmentMap.put("appointmentDate", appointment.getAppointmentDate().toString());
+            if (appointment.getTimeSlot() != null) {
+                appointmentMap.put("timeSlot", appointment.getTimeSlot().toString());
+            }
+            appointmentMap.put("status", appointment.getStatus().toString().toLowerCase());
+            appointmentMap.put("symptoms", appointment.getSymptoms());
+            appointmentMap.put("consultationType", appointment.getConsultationType());
+            appointmentMap.put("reasonForVisit", appointment.getReasonForVisit());
+            return appointmentMap;
+        }).collect(Collectors.toList());
+        
+        return ResponseEntity.ok(appointmentList);
     }
 
 
@@ -177,6 +213,27 @@ public class AppointmentController {
             } else {
                 return ResponseEntity.notFound().build();
             }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", e.getMessage()
+            ));
+        }
+    }
+
+    @GetMapping("/debug/all")
+    public ResponseEntity<?> getAllAppointmentsDebug() {
+        try {
+            List<User> allUsers = userService.getAllUsers();
+            Map<String, Object> debugInfo = new HashMap<>();
+            debugInfo.put("totalUsers", allUsers.size());
+            debugInfo.put("users", allUsers.stream().map(user -> Map.of(
+                "id", user.getId(),
+                "name", user.getName(),
+                "role", user.getRole().toString()
+            )).collect(Collectors.toList()));
+            
+            return ResponseEntity.ok(debugInfo);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of(
                 "success", false,

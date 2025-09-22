@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Clock, User, Pill, Search, CheckCircle, AlertCircle, FileText, Heart, Activity, Video, AudioLines, MapPin, Star, Send, Bot, Stethoscope, ExternalLink, Settings, Edit, Save, X, Bell, Mail, Smartphone, Moon, Globe } from 'lucide-react';
+import { Calendar, Clock, User, Pill, Search, CheckCircle, AlertCircle, FileText, Heart, Activity, Video, AudioLines, MapPin, Star, Send, Bot, Stethoscope, ExternalLink, Settings, Edit, Save, X, Bell, Mail, Smartphone, Moon, Globe, Zap } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { symptomService, type SymptomResult } from '@/services/symptomService';
@@ -84,6 +84,7 @@ const PatientDashboard = () => {
   });
   const [showSettings, setShowSettings] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [appointmentFilter, setAppointmentFilter] = useState('all');
 
   useEffect(() => {
     if (user?.id) {
@@ -95,6 +96,12 @@ const PatientDashboard = () => {
   useEffect(() => {
     if (user?.id) {
       loadAppointments();
+      
+      const interval = setInterval(() => {
+        loadAppointments();
+      }, 3000);
+      
+      return () => clearInterval(interval);
     }
   }, [user?.id]);
   
@@ -273,8 +280,18 @@ const PatientDashboard = () => {
 
   const loadAppointments = async () => {
     if (user?.id) {
-      const appointments = await appointmentService.getPatientAppointments(parseInt(user.id));
-      setUserAppointments(appointments);
+      try {
+        const response = await fetch(`http://localhost:8080/api/appointments/patient/${user.id}`);
+        if (response.ok) {
+          const appointments = await response.json();
+          console.log('Loaded patient appointments:', appointments);
+          setUserAppointments(appointments);
+        } else {
+          console.error('Failed to load appointments:', response.status);
+        }
+      } catch (error) {
+        console.error('Error loading appointments:', error);
+      }
     }
   };
 
@@ -751,52 +768,7 @@ const PatientDashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Health Metrics */}
-          <Card className="shadow-card bg-gradient-to-br from-card to-accent/5">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Activity className="h-5 w-5 text-primary" />
-                <span>Health Metrics</span>
-              </CardTitle>
-              <CardDescription>Your vital signs and health indicators</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-4 bg-card rounded-xl border border-border hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-center mb-2">
-                    <Heart className="h-8 w-8 text-emergency animate-pulse" />
-                  </div>
-                  <div className="text-2xl font-bold text-emergency">{healthMetrics.heartRate}</div>
-                  <div className="text-sm text-muted-foreground">BPM</div>
-                </div>
-                <div className="text-center p-4 bg-card rounded-xl border border-border hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-center mb-2">
-                    <Activity className="h-8 w-8 text-primary" />
-                  </div>
-                  <div className="text-2xl font-bold text-primary">{healthMetrics.bloodPressure}</div>
-                  <div className="text-sm text-muted-foreground">mmHg</div>
-                </div>
-                <div className="text-center p-4 bg-card rounded-xl border border-border hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-center mb-2">
-                    <div className="w-8 h-8 bg-warning/20 rounded-full flex items-center justify-center">
-                      <div className="w-4 h-4 bg-warning rounded-full"></div>
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-warning">{healthMetrics.temperature}°F</div>
-                  <div className="text-sm text-muted-foreground">Temperature</div>
-                </div>
-                <div className="text-center p-4 bg-card rounded-xl border border-border hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-center mb-2">
-                    <div className="w-8 h-8 bg-success/20 rounded-full flex items-center justify-center">
-                      <div className="w-4 h-4 bg-success rounded-full"></div>
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-success">{healthMetrics.weight} kg</div>
-                  <div className="text-sm text-muted-foreground">Weight</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+
           
           {/* Available Doctors */}
           <Card className="shadow-card">
@@ -1103,7 +1075,127 @@ const PatientDashboard = () => {
         </TabsContent>
 
         <TabsContent value="appointments" className="space-y-4">
-          <AppointmentManager />
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle>Your {t('appointments')}</CardTitle>
+              <CardDescription>Manage your doctor consultations</CardDescription>
+              <div className="space-y-3 mt-4">
+                <div className="flex flex-wrap gap-2">
+                  <Button 
+                    variant="medical" 
+                    onClick={() => {
+                      setIsInstantBooking(false);
+                      setShowAppointmentBooking(true);
+                    }}
+                  >
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Book Appointment
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    onClick={loadAppointments}
+                  >
+                    <Activity className="h-4 w-4 mr-2" />
+                    Refresh
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <span className="text-sm font-medium text-muted-foreground self-center">Filter:</span>
+                  {['all', 'pending', 'approved', 'cancelled'].map((filter) => (
+                    <Button
+                      key={filter}
+                      variant={appointmentFilter === filter ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setAppointmentFilter(filter)}
+                    >
+                      {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {userAppointments
+                .filter(appointment => appointmentFilter === 'all' || appointment.status === appointmentFilter)
+                .map((appointment) => (
+                <div key={appointment.id} className="border border-border rounded-lg p-4 space-y-2 hover:shadow-card transition-shadow duration-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <User className="h-4 w-4 text-primary" />
+                      <span className="font-medium">{appointment.doctorName}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {appointment.doctorSpecialization}
+                      </Badge>
+                    </div>
+                    <Badge variant={appointment.status === 'approved' ? 'default' : 'secondary'} className="animate-pulse-glow">
+                      {appointment.status}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                    <div className="flex items-center space-x-1">
+                      <Calendar className="h-3 w-3" />
+                      <span>{new Date(appointment.appointmentDate).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Clock className="h-3 w-3" />
+                      <span>{new Date(appointment.appointmentDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                  </div>
+                  {appointment.symptoms && (
+                    <div className="bg-muted/50 p-2 rounded text-sm">
+                      <strong>{t('symptoms')}:</strong> {appointment.symptoms}
+                    </div>
+                  )}
+                  <div className="flex gap-2 mt-2">
+                    {appointment.status === 'approved' && (
+                      <Button 
+                        size="sm" 
+                        variant="success" 
+                        onClick={() => startVideoCall(appointment.doctorName)}
+                      >
+                        <div className="flex items-center space-x-1 mr-1">
+                          <Video className="h-3 w-3" />
+                          <AudioLines className="h-3 w-3" />
+                        </div>
+                        {t('joinCall')}
+                      </Button>
+                    )}
+                    {appointment.status === 'pending' && (
+                      <>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => {
+                            toast({
+                              title: 'Reschedule Request',
+                              description: 'Reschedule functionality will be available soon',
+                            });
+                          }}
+                        >
+                          <Edit className="h-3 w-3 mr-1" />
+                          Reschedule
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="destructive" 
+                          onClick={() => {
+                            toast({
+                              title: 'Cancel Appointment',
+                              description: 'Appointment cancellation requested',
+                              variant: 'destructive'
+                            });
+                          }}
+                        >
+                          <X className="h-3 w-3 mr-1" />
+                          Cancel
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="prescriptions" className="space-y-4">
@@ -1583,7 +1675,9 @@ const PatientDashboard = () => {
             isInstant={isInstantBooking}
             onClose={() => {
               setShowAppointmentBooking(false);
-              loadAppointments();
+              setTimeout(() => {
+                loadAppointments();
+              }, 1000);
             }}
           />
         </div>
