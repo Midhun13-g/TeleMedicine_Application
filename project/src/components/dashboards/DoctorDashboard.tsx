@@ -709,7 +709,7 @@ const DoctorDashboard = () => {
           <TabsTrigger value="overview">{t('overview')}</TabsTrigger>
           <TabsTrigger value="appointments">{t('appointments')}</TabsTrigger>
           <TabsTrigger value="prescriptions">{t('prescriptions')}</TabsTrigger>
-          <TabsTrigger value="consultations">{t('consultations')}</TabsTrigger>
+          <TabsTrigger value="messages">Messages</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -869,76 +869,7 @@ const DoctorDashboard = () => {
             </CardContent>
           </Card>
 
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle>{t('quickActions')}</CardTitle>
-              <CardDescription>Common tasks for doctors</CardDescription>
-            </CardHeader>
-            <CardContent className="grid md:grid-cols-4 gap-4">
-              <Button 
-                variant="medical" 
-                className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group relative overflow-hidden"
-                onClick={() => {
-                  const appointmentsTab = document.querySelector('[value="appointments"]') as HTMLElement;
-                  if (appointmentsTab) appointmentsTab.click();
-                }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-success/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <CheckCircle className="h-6 w-6 relative z-10 group-hover:animate-pulse" />
-                <span className="relative z-10">{t('approve')} {t('appointments')}</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group"
-                onClick={() => {
-                  const prescriptionsTab = document.querySelector('[data-state="inactive"][value="prescriptions"]') as HTMLElement;
-                  if (prescriptionsTab) {
-                    prescriptionsTab.click();
-                  } else {
-                    // Fallback: try different selector
-                    const allTabs = document.querySelectorAll('[role="tab"]');
-                    const prescTab = Array.from(allTabs).find(tab => 
-                      tab.textContent?.toLowerCase().includes('prescription')
-                    ) as HTMLElement;
-                    if (prescTab) prescTab.click();
-                  }
-                }}
-              >
-                <FileText className="h-6 w-6 group-hover:scale-110 transition-transform" />
-                <span>Write {t('prescriptions')}</span>
-              </Button>
-              <Button 
-                variant="success" 
-                className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group"
-                onClick={() => {
-                  const consultationsTab = document.querySelector('[value="consultations"]') as HTMLElement;
-                  if (consultationsTab) consultationsTab.click();
-                }}
-              >
-                <div className="flex items-center space-x-1">
-                  <Video className="h-4 w-4 group-hover:animate-pulse" />
-                  <AudioLines className="h-4 w-4 group-hover:animate-pulse" />
-                </div>
-                <span>{t('startConsultation')}</span>
-              </Button>
-              <Button 
-                variant="secondary" 
-                className="h-20 flex-col space-y-2 hover:scale-105 transition-transform group"
-                onClick={() => {
-                  toast({
-                    title: 'Messages',
-                    description: 'Patient messaging system will be available soon.',
-                  });
-                }}
-              >
-                <div className="relative">
-                  <MessageSquare className="h-6 w-6 group-hover:animate-bounce" />
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-emergency rounded-full animate-pulse"></div>
-                </div>
-                <span>{t('patient')} Messages</span>
-              </Button>
-            </CardContent>
-          </Card>
+
           
           {/* Performance Metrics */}
           <Card className="shadow-card">
@@ -1272,50 +1203,17 @@ const DoctorDashboard = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="consultations" className="space-y-4">
+        <TabsContent value="messages" className="space-y-4">
           <Card className="shadow-card">
             <CardHeader>
-              <CardTitle>{t('videoAudioConsultations')}</CardTitle>
-              <CardDescription>{t('manageConsultations')}</CardDescription>
+              <CardTitle>Patient Messages</CardTitle>
+              <CardDescription>Communicate with your patients</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="border border-border rounded-lg p-4 space-y-2 hover:shadow-card transition-shadow">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-success rounded-full animate-pulse"></div>
-                    <span className="font-medium">{t('availableForConsultations')}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Patients can book video/audio calls with you
-                  </p>
-                  <Button variant="outline" size="sm" className="hover:scale-105 transition-transform">
-                    Go Offline
-                  </Button>
-                </div>
-
-                <div className="border border-border rounded-lg p-4 space-y-2 hover:shadow-card transition-shadow">
-                  <div className="text-lg font-semibold">{t('nextConsultation')}</div>
-                  <div className="text-sm text-muted-foreground">
-                    Krishna - 10:00 AM Today
-                  </div>
-                  <Button variant="medical" size="sm" className="hover:scale-105 transition-transform">
-                    <div className="flex items-center space-x-1 mr-1">
-                      <Video className="h-3 w-3" />
-                      <AudioLines className="h-3 w-3" />
-                    </div>
-                    {t('joinCall')}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="bg-gradient-subtle p-4 rounded-lg border border-border">
-                <h4 className="font-medium mb-2">{t('callFeatures')}</h4>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• {t('highQualityVideoAudio')}</li>
-                  <li>• {t('screenSharing')}</li>
-                  <li>• {t('callRecording')}</li>
-                  <li>• {t('secureHipaaCompliant')}</li>
-                </ul>
+              <div className="text-center py-8">
+                <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground mb-2">No messages yet</p>
+                <p className="text-sm text-muted-foreground">Patient messages will appear here</p>
               </div>
             </CardContent>
           </Card>

@@ -495,8 +495,17 @@ const PharmacyDashboard = () => {
                 <Button 
                   variant="medical" 
                   onClick={() => {
-                    const addMedicineTab = document.querySelector('[value="add-medicine"]') as HTMLElement;
-                    if (addMedicineTab) addMedicineTab.click();
+                    const addMedicineTab = document.querySelector('[data-state="inactive"][value="add-medicine"]') as HTMLElement;
+                    if (addMedicineTab) {
+                      addMedicineTab.click();
+                    } else {
+                      // Fallback: try different selector
+                      const allTabs = document.querySelectorAll('[role="tab"]');
+                      const addTab = Array.from(allTabs).find(tab => 
+                        tab.textContent?.toLowerCase().includes('add medicine')
+                      ) as HTMLElement;
+                      if (addTab) addTab.click();
+                    }
                   }}
                   className="h-16 flex-col space-y-1"
                 >
@@ -506,9 +515,17 @@ const PharmacyDashboard = () => {
                 <Button 
                   variant="outline" 
                   onClick={() => {
-                    const inventoryTab = document.querySelector('[value="inventory"]') as HTMLElement;
-                    if (inventoryTab) inventoryTab.click();
-                    setShowLowStock(true);
+                    const inventoryTab = document.querySelector('[data-state="inactive"][value="inventory"]') as HTMLElement;
+                    if (inventoryTab) {
+                      inventoryTab.click();
+                    } else {
+                      const allTabs = document.querySelectorAll('[role="tab"]');
+                      const invTab = Array.from(allTabs).find(tab => 
+                        tab.textContent?.toLowerCase().includes('inventory')
+                      ) as HTMLElement;
+                      if (invTab) invTab.click();
+                    }
+                    setTimeout(() => setShowLowStock(true), 100);
                   }}
                   className="h-16 flex-col space-y-1"
                 >
