@@ -18,28 +18,37 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> credentials) {
-        String email = credentials.get("email");
-        String password = credentials.get("password");
-        
-        User user = userService.authenticate(email, password);
-        
-        if (user != null) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("user", Map.of(
-                "id", user.getId(),
-                "name", user.getName(),
-                "email", user.getEmail(),
-                "role", user.getRole().toString().toLowerCase(),
-                "phone", user.getPhone() != null ? user.getPhone() : "",
-                "address", user.getAddress() != null ? user.getAddress() : "",
-                "specialization", user.getSpecialization() != null ? user.getSpecialization() : "",
-                "experience", user.getExperience() != null ? user.getExperience() : "",
-                "pharmacyName", user.getPharmacyName() != null ? user.getPharmacyName() : ""
-            ));
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid credentials"));
+        try {
+            String email = credentials.get("email");
+            String password = credentials.get("password");
+            
+            System.out.println("Login attempt for email: " + email);
+            
+            User user = userService.authenticate(email, password);
+            
+            if (user != null) {
+                System.out.println("Login successful for user: " + user.getName());
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", true);
+                response.put("user", Map.of(
+                    "id", user.getId(),
+                    "name", user.getName(),
+                    "email", user.getEmail(),
+                    "role", user.getRole().toString().toLowerCase(),
+                    "phone", user.getPhone() != null ? user.getPhone() : "",
+                    "address", user.getAddress() != null ? user.getAddress() : "",
+                    "specialization", user.getSpecialization() != null ? user.getSpecialization() : "",
+                    "experience", user.getExperience() != null ? user.getExperience() : "",
+                    "pharmacyName", user.getPharmacyName() != null ? user.getPharmacyName() : ""
+                ));
+                return ResponseEntity.ok(response);
+            } else {
+                System.out.println("Login failed for email: " + email);
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid credentials"));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Login error: " + e.getMessage()));
         }
     }
 
@@ -51,7 +60,10 @@ public class AuthController {
             String name = (String) userData.get("name");
             String roleStr = (String) userData.get("role");
             
+            System.out.println("Registration attempt for email: " + email + ", role: " + roleStr);
+            
             if (userService.existsByEmail(email)) {
+                System.out.println("Registration failed: Email already exists - " + email);
                 return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Email already exists"));
             }
             
@@ -67,6 +79,7 @@ public class AuthController {
             if (userData.get("pharmacyName") != null) user.setPharmacyName((String) userData.get("pharmacyName"));
             
             User savedUser = userService.save(user);
+            System.out.println("Registration successful for user: " + savedUser.getName());
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
@@ -80,7 +93,8 @@ public class AuthController {
             
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Registration failed: " + e.getMessage()));
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Registration failed: " + e.getMessage()));
         }
     }
 
@@ -150,21 +164,25 @@ public class AuthController {
     public ResponseEntity<?> getAllUsers() {
         try {
             var users = userService.getAllUsers();
-            var userList = users.stream().map(user -> Map.of(
-                "id", user.getId(),
-                "name", user.getName(),
-                "email", user.getEmail(),
-                "role", user.getRole().toString(),
-                "phone", user.getPhone() != null ? user.getPhone() : "",
-                "address", user.getAddress() != null ? user.getAddress() : "",
-                "specialization", user.getSpecialization() != null ? user.getSpecialization() : "",
-                "pharmacyName", user.getPharmacyName() != null ? user.getPharmacyName() : "",
-                "createdAt", user.getCreatedAt() != null ? user.getCreatedAt().toString() : ""
-            )).toList();
+            var userList = users.stream().map(user -> {
+                var userMap = new HashMap<String, Object>();
+                userMap.put("id", user.getId());
+                userMap.put("name", user.getName());
+                userMap.put("email", user.getEmail());
+                userMap.put("role", user.getRole().toString());
+                userMap.put("phone", user.getPhone() != null ? user.getPhone() : "");
+                userMap.put("address", user.getAddress() != null ? user.getAddress() : "");
+                userMap.put("specialization", user.getSpecialization() != null ? user.getSpecialization() : "");
+                userMap.put("pharmacyName", user.getPharmacyName() != null ? user.getPharmacyName() : "");
+                userMap.put("suspended", user.isSuspended());
+                userMap.put("createdAt", user.getCreatedAt() != null ? user.getCreatedAt().toString() : "");
+                return userMap;
+            }).toList();
             
             return ResponseEntity.ok(userList);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Failed to fetch users: " + e.getMessage()));
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Failed to fetch users: " + e.getMessage()));
         }
     }
 
@@ -191,10 +209,25 @@ public class AuthController {
                 return ResponseEntity.badRequest().body(Map.of("success", false, "message", "User not found"));
             }
             
-            // For now, we'll just return success. In a real app, you'd add a suspended field to User model
+            userService.suspendUser(userId);
             return ResponseEntity.ok(Map.of("success", true, "message", "User suspended successfully"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Failed to suspend user: " + e.getMessage()));
+        }
+    }
+    
+    @PutMapping("/users/{userId}/unsuspend")
+    public ResponseEntity<?> unsuspendUser(@PathVariable Long userId) {
+        try {
+            User user = userService.findById(userId);
+            if (user == null) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "User not found"));
+            }
+            
+            userService.unsuspendUser(userId);
+            return ResponseEntity.ok(Map.of("success", true, "message", "User unsuspended successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Failed to unsuspend user: " + e.getMessage()));
         }
     }
 
@@ -202,19 +235,30 @@ public class AuthController {
     public ResponseEntity<?> getSystemStats() {
         try {
             var users = userService.getAllUsers();
+            if (users == null) {
+                users = new java.util.ArrayList<>();
+            }
+            
             long totalPatients = users.stream().filter(u -> u.getRole() == User.Role.PATIENT).count();
             long totalDoctors = users.stream().filter(u -> u.getRole() == User.Role.DOCTOR).count();
             long totalPharmacies = users.stream().filter(u -> u.getRole() == User.Role.PHARMACY).count();
+            long totalAdmins = users.stream().filter(u -> u.getRole() == User.Role.ADMIN).count();
             
             return ResponseEntity.ok(Map.of(
                 "totalUsers", users.size(),
-                "totalPatients", totalPatients,
-                "totalDoctors", totalDoctors,
-                "totalPharmacies", totalPharmacies,
-                "totalAdmins", 1
+                "totalPatients", (int)totalPatients,
+                "totalDoctors", (int)totalDoctors,
+                "totalPharmacies", (int)totalPharmacies,
+                "totalAdmins", (int)totalAdmins
             ));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Failed to fetch stats: " + e.getMessage()));
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Failed to fetch stats: " + e.getMessage()));
         }
+    }
+    
+    @GetMapping("/health")
+    public ResponseEntity<?> healthCheck() {
+        return ResponseEntity.ok(Map.of("status", "OK", "message", "Admin API is running"));
     }
 }

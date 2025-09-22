@@ -69,6 +69,15 @@ public class ProjectbackendApplication {
 				System.out.println("Database already contains data. Skipping initialization.");
 			}
 
+			// Always ensure admin user exists
+			if (!userService.existsByEmail("admin@teleasha.com")) {
+				User admin = new User("admin@teleasha.com", "admin123", "System Admin", User.Role.ADMIN);
+				userService.save(admin);
+				System.out.println("Admin user created successfully");
+			} else {
+				System.out.println("Admin user already exists");
+			}
+
 			// Print all users for debugging
 			System.out.println("\n=== All Users in Database ===");
 			userService.getAllUsers().forEach(user -> System.out

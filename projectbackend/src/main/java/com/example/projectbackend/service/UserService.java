@@ -20,6 +20,7 @@ public class UserService {
     public User authenticate(String email, String password) {
         return userRepository.findByEmail(email)
                 .filter(user -> passwordEncoder.matches(password, user.getPassword()))
+                .filter(user -> !user.isSuspended())
                 .orElse(null);
     }
 
@@ -49,5 +50,21 @@ public class UserService {
     
     public void deleteUser(Long userId) {
         userRepository.deleteById(userId);
+    }
+    
+    public void suspendUser(Long userId) {
+        User user = findById(userId);
+        if (user != null) {
+            user.setSuspended(true);
+            save(user);
+        }
+    }
+    
+    public void unsuspendUser(Long userId) {
+        User user = findById(userId);
+        if (user != null) {
+            user.setSuspended(false);
+            save(user);
+        }
     }
 }

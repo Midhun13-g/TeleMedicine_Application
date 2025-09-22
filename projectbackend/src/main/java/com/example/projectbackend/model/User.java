@@ -29,6 +29,7 @@ public class User {
     private String licenseNumber;
     private String pharmacyName;
     private String experience;
+    private boolean suspended = false;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     
@@ -87,4 +88,7 @@ public class User {
     
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    
+    public boolean isSuspended() { return suspended; }
+    public void setSuspended(boolean suspended) { this.suspended = suspended; }
 }
