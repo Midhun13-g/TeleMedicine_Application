@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Time Slots</title>
+</head>
+<body>
+    <h1>Test Time Slots API</h1>
+    
+    <div>
+        <label>Doctor ID: </label>
+        <input type="number" id="doctorId" value="1" />
+    </div>
+    <div>
+        <label>Date: </label>
+        <input type="date" id="date" />
+    </div>
+    <button onclick="testSlots()">Test Slots</button>
+    <button onclick="testSlotsTest()">Test Slots (Test Endpoint)</button>
+    
+    <div id="result"></div>
+
+    <script>
+        // Set today's date as default
+        document.getElementById('date').value = new Date().toISOString().split('T')[0];
+        
+        async function testSlots() {
+            const doctorId = document.getElementById('doctorId').value;
+            const date = document.getElementById('date').value;
+            
+            try {
+                console.log('Testing slots for doctor:', doctorId, 'date:', date);
+                const response = await fetch(`http://localhost:8080/api/appointments/available-slots/${doctorId}?date=${date}`);
+                console.log('Response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Slots data:', data);
+                    document.getElementById('result').innerHTML = 
+                        '<h3>Appointment Slots:</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                } else {
+                    console.error('Error response:', response.status, response.statusText);
+                    document.getElementById('result').innerHTML = 
+                        '<h3>Error: ' + response.status + ' ' + response.statusText + '</h3>';
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                document.getElementById('result').innerHTML = 
+                    '<h3>Network Error: ' + error.message + '</h3>';
+            }
+        }
+        
+        async function testSlotsTest() {
+            const doctorId = document.getElementById('doctorId').value;
+            const date = document.getElementById('date').value;
+            
+            try {
+                console.log('Testing test slots for doctor:', doctorId, 'date:', date);
+                const response = await fetch(`http://localhost:8080/api/test/slots/${doctorId}?date=${date}`);
+                console.log('Response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Test slots data:', data);
+                    document.getElementById('result').innerHTML = 
+                        '<h3>Test Slots:</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                } else {
+                    console.error('Error response:', response.status, response.statusText);
+                    document.getElementById('result').innerHTML = 
+                        '<h3>Error: ' + response.status + ' ' + response.statusText + '</h3>';
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                document.getElementById('result').innerHTML = 
+                    '<h3>Network Error: ' + error.message + '</h3>';
+            }
+        }
+    </script>
+</body>
+</html>

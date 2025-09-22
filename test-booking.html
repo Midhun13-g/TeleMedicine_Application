@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Appointment Booking</title>
+</head>
+<body>
+    <h1>Test Appointment Booking</h1>
+    
+    <div>
+        <label>Patient ID: </label>
+        <input type="number" id="patientId" value="1" />
+    </div>
+    <div>
+        <label>Doctor ID: </label>
+        <input type="number" id="doctorId" value="4" />
+    </div>
+    <div>
+        <label>Date: </label>
+        <input type="date" id="date" />
+    </div>
+    <div>
+        <label>Time: </label>
+        <input type="time" id="time" value="10:00" />
+    </div>
+    <div>
+        <label>Symptoms: </label>
+        <textarea id="symptoms" placeholder="Enter symptoms">Fever and headache</textarea>
+    </div>
+    <button onclick="testBooking()">Test Booking</button>
+    
+    <div id="result"></div>
+
+    <script>
+        // Set today's date as default
+        document.getElementById('date').value = new Date().toISOString().split('T')[0];
+        
+        async function testBooking() {
+            const patientId = parseInt(document.getElementById('patientId').value);
+            const doctorId = parseInt(document.getElementById('doctorId').value);
+            const date = document.getElementById('date').value;
+            const time = document.getElementById('time').value;
+            const symptoms = document.getElementById('symptoms').value;
+            
+            const appointmentDate = `${date}T${time}:00`;
+            
+            const payload = {
+                patientId: patientId,
+                doctorId: doctorId,
+                appointmentDate: appointmentDate,
+                symptoms: symptoms
+            };
+            
+            try {
+                console.log('Testing booking with payload:', payload);
+                const response = await fetch('http://localhost:8080/api/appointments/book', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                console.log('Response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Booking response:', data);
+                    document.getElementById('result').innerHTML = 
+                        '<h3>Booking Result:</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                } else {
+                    const errorData = await response.json();
+                    console.error('Error response:', errorData);
+                    document.getElementById('result').innerHTML = 
+                        '<h3>Error: ' + response.status + '</h3><pre>' + JSON.stringify(errorData, null, 2) + '</pre>';
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                document.getElementById('result').innerHTML = 
+                    '<h3>Network Error: ' + error.message + '</h3>';
+            }
+        }
+    </script>
+</body>
+</html>

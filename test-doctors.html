@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Doctors API</title>
+</head>
+<body>
+    <h1>Test Doctors API</h1>
+    <button onclick="testDoctors()">Test Doctors Endpoint</button>
+    <div id="result"></div>
+
+    <script>
+        async function testDoctors() {
+            try {
+                console.log('Testing doctors endpoint...');
+                const response = await fetch('http://localhost:8080/api/appointments/doctors');
+                console.log('Response status:', response.status);
+                
+                if (response.ok) {
+                    const doctors = await response.json();
+                    console.log('Doctors:', doctors);
+                    document.getElementById('result').innerHTML = 
+                        '<h3>Success!</h3><pre>' + JSON.stringify(doctors, null, 2) + '</pre>';
+                } else {
+                    console.error('Error response:', response.status, response.statusText);
+                    document.getElementById('result').innerHTML = 
+                        '<h3>Error: ' + response.status + ' ' + response.statusText + '</h3>';
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                document.getElementById('result').innerHTML = 
+                    '<h3>Network Error: ' + error.message + '</h3>';
+            }
+        }
+    </script>
+</body>
+</html>

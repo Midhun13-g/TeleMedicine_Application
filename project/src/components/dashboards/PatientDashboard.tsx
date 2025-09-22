@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { symptomService, type SymptomResult } from '@/services/symptomService';
 import { appointmentService, type Appointment } from '@/services/appointmentService';
 import AppointmentBooking from '@/components/AppointmentBooking';
+import AppointmentManager from '@/components/AppointmentManager';
 import { VideoCall } from '@/components/VideoCall';
 import { CallNotification } from '@/components/CallNotification';
 import { callService } from '@/services/callService';
@@ -1102,55 +1103,7 @@ const PatientDashboard = () => {
         </TabsContent>
 
         <TabsContent value="appointments" className="space-y-4">
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle>Your {t('appointments')}</CardTitle>
-              <CardDescription>Manage your doctor consultations</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {userAppointments.map((appointment) => (
-                <div key={appointment.id} className="border border-border rounded-lg p-4 space-y-2 hover:shadow-card transition-shadow duration-200">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <User className="h-4 w-4 text-primary" />
-                      <span className="font-medium">{appointment.doctorName}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {appointment.doctorSpecialization}
-                      </Badge>
-                    </div>
-                    <Badge variant={appointment.status === 'approved' ? 'default' : 'secondary'} className="animate-pulse-glow">
-                      {t(appointment.status)}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                    <div className="flex items-center space-x-1">
-                      <Calendar className="h-3 w-3" />
-                      <span>{appointment.appointmentDate}</span>
-                    </div>
-                  </div>
-                  {appointment.symptoms && (
-                    <div className="bg-muted/50 p-2 rounded text-sm">
-                      <strong>{t('symptoms')}:</strong> {appointment.symptoms}
-                    </div>
-                  )}
-                  {appointment.status === 'approved' && (
-                    <Button 
-                      size="sm" 
-                      variant="success" 
-                      className="mt-2"
-                      onClick={() => startVideoCall(appointment.doctorName)}
-                    >
-                      <div className="flex items-center space-x-1 mr-1">
-                        <Video className="h-3 w-3" />
-                        <AudioLines className="h-3 w-3" />
-                      </div>
-                      {t('joinCall')}
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          <AppointmentManager />
         </TabsContent>
 
         <TabsContent value="prescriptions" className="space-y-4">

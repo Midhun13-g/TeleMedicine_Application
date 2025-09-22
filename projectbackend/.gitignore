@@ -37,3 +37,6 @@ data/
 *.db
 *.mv.db
 *.trace.db
+
+### User-specific database ###
+.telemedicine/

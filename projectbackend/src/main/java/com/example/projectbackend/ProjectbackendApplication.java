@@ -48,6 +48,22 @@ public class ProjectbackendApplication {
 				userService.save(doctor1);
 				System.out.println("Created doctor: Dr. Rachit Sharma with ID: " + doctor1.getId());
 
+				User doctor2 = new User("doctor2@test.com", "password", "Dr. Priya Singh", User.Role.DOCTOR);
+				doctor2.setPhone("+91-9876543214");
+				doctor2.setSpecialization("Cardiology");
+				doctor2.setExperience("8+ years");
+				doctor2.setLicenseNumber("MED12346");
+				userService.save(doctor2);
+				System.out.println("Created doctor: Dr. Priya Singh with ID: " + doctor2.getId());
+
+				User doctor3 = new User("doctor3@test.com", "password", "Dr. Amit Patel", User.Role.DOCTOR);
+				doctor3.setPhone("+91-9876543215");
+				doctor3.setSpecialization("Dermatology");
+				doctor3.setExperience("6+ years");
+				doctor3.setLicenseNumber("MED12347");
+				userService.save(doctor3);
+				System.out.println("Created doctor: Dr. Amit Patel with ID: " + doctor3.getId());
+
 				System.out.println("Initial data creation completed.");
 			} else {
 				System.out.println("Database already contains data. Skipping initialization.");

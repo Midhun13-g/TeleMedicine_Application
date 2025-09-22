@@ -48,6 +48,8 @@ const AppointmentBooking: React.FC<AppointmentBookingProps> = ({ onClose, isInst
   };
 
   const handleBooking = async () => {
+    console.log('Booking attempt with:', { selectedDoctor, selectedDate, selectedTime, symptoms, user });
+    
     if (!selectedDoctor || !selectedDate || !selectedTime || !symptoms.trim()) {
       toast({
         title: "Missing Information",
@@ -57,17 +59,29 @@ const AppointmentBooking: React.FC<AppointmentBookingProps> = ({ onClose, isInst
       return;
     }
 
+    if (!user?.id) {
+      toast({
+        title: "Authentication Error",
+        description: "Please log in to book an appointment",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
     
     try {
       const appointmentDate = `${selectedDate}T${selectedTime}:00`;
+      console.log('Formatted appointment date:', appointmentDate);
       
       const result = await appointmentService.bookAppointment({
-        patientId: parseInt(user?.id || '0'),
+        patientId: parseInt(user.id),
         doctorId: parseInt(selectedDoctor),
         appointmentDate,
         symptoms
       });
+
+      console.log('Booking result:', result);
 
       if (result.success) {
         toast({
@@ -83,6 +97,7 @@ const AppointmentBooking: React.FC<AppointmentBookingProps> = ({ onClose, isInst
         });
       }
     } catch (error) {
+      console.error('Booking error:', error);
       toast({
         title: "Error",
         description: "Something went wrong. Please try again.",
