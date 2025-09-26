@@ -5,6 +5,7 @@ import com.example.projectbackend.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import java.util.List;
+import java.util.Optional;
 import java.time.LocalDateTime;
 
 @Service
@@ -18,10 +19,14 @@ public class UserService {
     }
 
     public User authenticate(String email, String password) {
-        return userRepository.findByEmail(email)
-                .filter(user -> passwordEncoder.matches(password, user.getPassword()))
-                .filter(user -> !user.isSuspended())
-                .orElse(null);
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            if (passwordEncoder.matches(password, user.getPassword())) {
+                return user; // Return user even if suspended, let controller handle it
+            }
+        }
+        return null;
     }
 
     public User findById(Long id) {
@@ -48,23 +53,33 @@ public class UserService {
         return userRepository.findAll();
     }
     
-    public void deleteUser(Long userId) {
-        userRepository.deleteById(userId);
-    }
-    
-    public void suspendUser(Long userId) {
+    public User suspendUser(Long userId) {
         User user = findById(userId);
-        if (user != null) {
+        if (user != null && user.getRole() != User.Role.ADMIN) {
             user.setSuspended(true);
-            save(user);
+            user.setUpdatedAt(LocalDateTime.now());
+            return userRepository.save(user);
         }
+        return null;
     }
     
-    public void unsuspendUser(Long userId) {
+    public User unsuspendUser(Long userId) {
         User user = findById(userId);
         if (user != null) {
             user.setSuspended(false);
-            save(user);
+            user.setUpdatedAt(LocalDateTime.now());
+            return userRepository.save(user);
         }
+        return null;
     }
+    
+    public boolean deleteUser(Long userId) {
+        User user = findById(userId);
+        if (user != null && user.getRole() != User.Role.ADMIN) {
+            userRepository.delete(user);
+            return true;
+        }
+        return false;
+    }
+
 }

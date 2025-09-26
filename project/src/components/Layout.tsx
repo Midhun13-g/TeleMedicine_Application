@@ -25,8 +25,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         return 'text-success';
       case 'pharmacy':
         return 'text-warning';
-      case 'admin':
-        return 'text-emergency';
+
       default:
         return 'text-foreground';
     }

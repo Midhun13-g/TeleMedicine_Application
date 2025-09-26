@@ -6,14 +6,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class AccessDemoController {
 
-    @GetMapping("/admin/dashboard")
-    public String adminDashboard() {
-        return "Admin Dashboard: Only accessible by ADMIN";
-    }
+
 
     @GetMapping("/user/dashboard")
     public String userDashboard() {
-        return "User Dashboard: Accessible by USER and ADMIN";
+        return "User Dashboard: Accessible by USER";
     }
 
     @GetMapping("/common")

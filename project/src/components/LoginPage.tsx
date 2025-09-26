@@ -25,21 +25,10 @@ const LoginPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      // Check for admin credentials first
-      if (email === 'admin@teleasha.com' && password === 'admin123') {
-        const adminUser = {
-          id: 'admin',
-          name: 'System Administrator',
-          email: 'admin@teleasha.com',
-          role: 'ADMIN'
-        };
-        localStorage.setItem('user', JSON.stringify(adminUser));
-        window.location.reload();
-        return;
-      }
+
       
-      const success = await login(email, password);
-      if (success) {
+      const result = await login(email, password);
+      if (result.success) {
         toast({
           title: t('login') + " Successful",
           description: t('welcome') + " to TeleAsha!",
@@ -47,7 +36,7 @@ const LoginPage = () => {
       } else {
         toast({
           title: t('login') + " Failed",
-          description: "Invalid credentials.",
+          description: result.message || "Invalid credentials.",
           variant: "destructive",
         });
       }

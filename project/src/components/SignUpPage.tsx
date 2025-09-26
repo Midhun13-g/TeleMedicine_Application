@@ -27,7 +27,8 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onBackToLogin }) => {
     role: '',
     specialization: '',
     licenseNumber: '',
-    pharmacyName: ''
+    pharmacyName: '',
+    adminKey: ''
   });
 
   const handleInputChange = (field: string, value: string) => {
@@ -187,6 +188,12 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onBackToLogin }) => {
                     <span>Pharmacy</span>
                   </div>
                 </SelectItem>
+                <SelectItem value="admin">
+                  <div className="flex items-center space-x-2">
+                    <Activity className="h-4 w-4 text-destructive" />
+                    <span>Administrator</span>
+                  </div>
+                </SelectItem>
               </SelectContent>
             </Select>
             
@@ -230,6 +237,25 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onBackToLogin }) => {
                   value={formData.licenseNumber}
                   onChange={(e) => handleInputChange('licenseNumber', e.target.value)}
                 />
+              </div>
+            )}
+            
+            {formData.role === 'admin' && (
+              <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-xl">
+                <div className="flex items-center space-x-2 mb-3">
+                  <Activity className="h-4 w-4 text-destructive" />
+                  <span className="font-medium text-destructive">Administrator Access</span>
+                </div>
+                <Input
+                  type="password"
+                  placeholder="Admin Secret Key"
+                  value={formData.adminKey}
+                  onChange={(e) => handleInputChange('adminKey', e.target.value)}
+                  className="bg-background/50"
+                />
+                <p className="text-xs text-destructive/80 mt-2">
+                  Administrator accounts require a secret key. Contact system administrator for access.
+                </p>
               </div>
             )}
             

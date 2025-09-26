@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Test - TeleAsha</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button.danger {
+            background: #dc3545;
+        }
+        button.danger:hover {
+            background: #c82333;
+        }
+        button.warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        button.warning:hover {
+            background: #e0a800;
+        }
+        .result {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+        }
+        .user-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background: #f9f9f9;
+        }
+        .user-actions {
+            margin-top: 10px;
+        }
+        .status-active {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .status-suspended {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ TeleAsha Admin Test Panel</h1>
+        <p><strong>Default Admin Credentials:</strong></p>
+        <ul>
+            <li>Email: admin@teleasha.com</li>
+            <li>Password: admin123</li>
+        </ul>
+        <p><strong>Admin Secret Key:</strong> TELEASHA_ADMIN_2024</p>
+    </div>
+
+    <div class="container">
+        <h2>🔐 Admin Login Test</h2>
+        <input type="email" id="loginEmail" placeholder="Email" value="admin@teleasha.com">
+        <input type="password" id="loginPassword" placeholder="Password" value="admin123">
+        <button onclick="testAdminLogin()">Login as Admin</button>
+        <div id="loginResult" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="container">
+        <h2>👥 User Management</h2>
+        <button onclick="loadAllUsers()">Load All Users</button>
+        <div id="usersResult" class="result" style="display: none;"></div>
+        <div id="usersList"></div>
+    </div>
+
+    <div class="container">
+        <h2>➕ Create Test Admin</h2>
+        <input type="text" id="adminName" placeholder="Admin Name" value="Test Admin">
+        <input type="email" id="adminEmail" placeholder="Admin Email" value="testadmin@teleasha.com">
+        <input type="password" id="adminPassword" placeholder="Password" value="testadmin123">
+        <input type="password" id="adminKey" placeholder="Admin Key" value="TELEASHA_ADMIN_2024">
+        <button onclick="createTestAdmin()">Create Test Admin</button>
+        <div id="createAdminResult" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api';
+        let currentToken = null;
+
+        async function testAdminLogin() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const result = await response.json();
+                const resultDiv = document.getElementById('loginResult');
+                resultDiv.style.display = 'block';
+                
+                if (result.success) {
+                    currentToken = result.token; // If you implement JWT tokens later
+                    resultDiv.innerHTML = `✅ Login Successful!\n\nUser Details:\n${JSON.stringify(result.user, null, 2)}`;
+                    resultDiv.style.background = '#d4edda';
+                    resultDiv.style.color = '#155724';
+                } else {
+                    resultDiv.innerHTML = `❌ Login Failed: ${result.message}`;
+                    resultDiv.style.background = '#f8d7da';
+                    resultDiv.style.color = '#721c24';
+                }
+            } catch (error) {
+                const resultDiv = document.getElementById('loginResult');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `❌ Error: ${error.message}`;
+                resultDiv.style.background = '#f8d7da';
+                resultDiv.style.color = '#721c24';
+            }
+        }
+
+        async function loadAllUsers() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/users`);
+                const users = await response.json();
+                
+                const resultDiv = document.getElementById('usersResult');
+                const usersListDiv = document.getElementById('usersList');
+                
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `✅ Loaded ${users.length} users`;
+                resultDiv.style.background = '#d4edda';
+                resultDiv.style.color = '#155724';
+                
+                usersListDiv.innerHTML = '';
+                users.forEach(user => {
+                    const userCard = document.createElement('div');
+                    userCard.className = 'user-card';
+                    
+                    const statusClass = user.suspended ? 'status-suspended' : 'status-active';
+                    const statusText = user.suspended ? 'SUSPENDED' : 'ACTIVE';
+                    
+                    userCard.innerHTML = `
+                        <div>
+                            <strong>${user.name}</strong> (${user.email})
+                            <span class="${statusClass}">[${statusText}]</span>
+                        </div>
+                        <div>Role: ${user.role} | ID: ${user.id}</div>
+                        ${user.phone ? `<div>Phone: ${user.phone}</div>` : ''}
+                        ${user.specialization ? `<div>Specialization: ${user.specialization}</div>` : ''}
+                        ${user.pharmacyName ? `<div>Pharmacy: ${user.pharmacyName}</div>` : ''}
+                        <div class="user-actions">
+                            ${user.role !== 'ADMIN' ? `
+                                ${user.suspended ? 
+                                    `<button class="warning" onclick="unsuspendUser(${user.id})">Unsuspend</button>` :
+                                    `<button class="warning" onclick="suspendUser(${user.id})">Suspend</button>`
+                                }
+                                <button class="danger" onclick="deleteUser(${user.id}, '${user.name}')">Delete</button>
+                            ` : '<em>Admin account - protected</em>'}
+                        </div>
+                    `;
+                    
+                    usersListDiv.appendChild(userCard);
+                });
+                
+            } catch (error) {
+                const resultDiv = document.getElementById('usersResult');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `❌ Error loading users: ${error.message}`;
+                resultDiv.style.background = '#f8d7da';
+                resultDiv.style.color = '#721c24';
+            }
+        }
+
+        async function suspendUser(userId) {
+            try {
+                const response = await fetch(`${API_BASE}/auth/admin/suspend/${userId}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('✅ User suspended successfully');
+                    loadAllUsers(); // Refresh the list
+                } else {
+                    alert(`❌ Failed to suspend user: ${result.message}`);
+                }
+            } catch (error) {
+                alert(`❌ Error: ${error.message}`);
+            }
+        }
+
+        async function unsuspendUser(userId) {
+            try {
+                const response = await fetch(`${API_BASE}/auth/admin/unsuspend/${userId}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('✅ User unsuspended successfully');
+                    loadAllUsers(); // Refresh the list
+                } else {
+                    alert(`❌ Failed to unsuspend user: ${result.message}`);
+                }
+            } catch (error) {
+                alert(`❌ Error: ${error.message}`);
+            }
+        }
+
+        async function deleteUser(userId, userName) {
+            if (!confirm(`Are you sure you want to delete user "${userName}"? This action cannot be undone.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/admin/delete/${userId}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('✅ User deleted successfully');
+                    loadAllUsers(); // Refresh the list
+                } else {
+                    alert(`❌ Failed to delete user: ${result.message}`);
+                }
+            } catch (error) {
+                alert(`❌ Error: ${error.message}`);
+            }
+        }
+
+        async function createTestAdmin() {
+            const name = document.getElementById('adminName').value;
+            const email = document.getElementById('adminEmail').value;
+            const password = document.getElementById('adminPassword').value;
+            const adminKey = document.getElementById('adminKey').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        name,
+                        email,
+                        password,
+                        role: 'admin',
+                        adminKey
+                    })
+                });
+                
+                const result = await response.json();
+                const resultDiv = document.getElementById('createAdminResult');
+                resultDiv.style.display = 'block';
+                
+                if (result.success) {
+                    resultDiv.innerHTML = `✅ Test Admin Created Successfully!\n\nAdmin Details:\n${JSON.stringify(result.user, null, 2)}`;
+                    resultDiv.style.background = '#d4edda';
+                    resultDiv.style.color = '#155724';
+                } else {
+                    resultDiv.innerHTML = `❌ Failed to create admin: ${result.message}`;
+                    resultDiv.style.background = '#f8d7da';
+                    resultDiv.style.color = '#721c24';
+                }
+            } catch (error) {
+                const resultDiv = document.getElementById('createAdminResult');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `❌ Error: ${error.message}`;
+                resultDiv.style.background = '#f8d7da';
+                resultDiv.style.color = '#721c24';
+            }
+        }
+
+        // Auto-load users on page load
+        window.onload = function() {
+            loadAllUsers();
+        };
+    </script>
+</body>
+</html>

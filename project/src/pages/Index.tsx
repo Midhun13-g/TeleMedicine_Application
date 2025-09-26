@@ -6,6 +6,7 @@ import DoctorDashboard from '@/components/dashboards/DoctorDashboard';
 import PharmacyDashboard from '@/components/dashboards/PharmacyDashboard';
 import AdminDashboard from '@/components/dashboards/AdminDashboard';
 
+
 const Index = () => {
   const { user, isAuthenticated } = useAuth();
 

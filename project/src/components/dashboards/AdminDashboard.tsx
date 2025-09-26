@@ -1,74 +1,100 @@
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { Users, Activity, Building2, TrendingUp, Download, UserCheck, AlertCircle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { 
+  Users, 
+  UserCheck, 
+  UserX, 
+  Shield, 
+  Activity, 
+  TrendingUp, 
+  AlertTriangle,
+  Search,
+  Trash2,
+  Ban,
+  CheckCircle,
+  Settings,
+  BarChart3,
+  Calendar,
+  Clock,
+  Stethoscope,
+  Building2,
+  Heart
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { demoUsers, mockAnalytics } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
 
-interface SystemUser {
+interface User {
   id: number;
   name: string;
   email: string;
   role: string;
-  phone?: string;
-  address?: string;
-  specialization?: string;
-  pharmacyName?: string;
+  phone: string;
+  address: string;
+  specialization: string;
+  pharmacyName: string;
+  suspended: boolean;
   createdAt: string;
-}
-
-interface SystemStats {
-  totalUsers: number;
-  totalPatients: number;
-  totalDoctors: number;
-  totalPharmacies: number;
-  totalAdmins: number;
 }
 
 const AdminDashboard = () => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { toast } = useToast();
-  const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
-  const [systemStats, setSystemStats] = useState<SystemStats>({
+  const [users, setUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState({
     totalUsers: 0,
-    totalPatients: 0,
-    totalDoctors: 0,
-    totalPharmacies: 0,
-    totalAdmins: 0
+    activeUsers: 0,
+    suspendedUsers: 0,
+    doctors: 0,
+    patients: 0,
+    pharmacies: 0
   });
-  const [loading, setLoading] = useState(true);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(new Date());
 
   useEffect(() => {
-    loadSystemData();
+    loadUsers();
+    // Auto-refresh dashboard every 30 seconds
+    const interval = setInterval(() => {
+      loadUsers();
+    }, 30000);
+    return () => clearInterval(interval);
   }, []);
 
-  const loadSystemData = async () => {
+  useEffect(() => {
+    filterUsers();
+  }, [users, searchTerm, roleFilter, statusFilter]);
+
+  const loadUsers = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      
-      // Load all users
-      const usersResponse = await fetch('http://localhost:8080/api/admin/users');
-      if (usersResponse.ok) {
-        const users = await usersResponse.json();
-        setSystemUsers(users);
-      }
-      
-      // Load system stats
-      const statsResponse = await fetch('http://localhost:8080/api/admin/stats');
-      if (statsResponse.ok) {
-        const stats = await statsResponse.json();
-        setSystemStats(stats);
+      const response = await fetch('http://localhost:8080/api/auth/users');
+      if (response.ok) {
+        const userData = await response.json();
+        setUsers(userData);
+        calculateStats(userData);
+        setLastUpdated(new Date());
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to load users',
+          variant: 'destructive'
+        });
       }
     } catch (error) {
-      console.error('Error loading system data:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load system data',
+        description: 'Failed to connect to server',
         variant: 'destructive'
       });
     } finally {
@@ -76,23 +102,71 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleSuspendUser = async (userId: number, userName: string) => {
-    if (!confirm(`Are you sure you want to suspend ${userName}?`)) return;
-    
+  const refreshDashboard = async () => {
+    setDashboardLoading(true);
+    await loadUsers();
+    setTimeout(() => {
+      setDashboardLoading(false);
+      toast({
+        title: 'Dashboard Refreshed',
+        description: 'All data has been updated successfully',
+      });
+    }, 1000);
+  };
+
+  const calculateStats = (userData: User[]) => {
+    const stats = {
+      totalUsers: userData.length,
+      activeUsers: userData.filter(u => !u.suspended).length,
+      suspendedUsers: userData.filter(u => u.suspended).length,
+      doctors: userData.filter(u => u.role === 'DOCTOR').length,
+      patients: userData.filter(u => u.role === 'PATIENT').length,
+      pharmacies: userData.filter(u => u.role === 'PHARMACY').length
+    };
+    setStats(stats);
+  };
+
+  const filterUsers = () => {
+    let filtered = users;
+
+    if (searchTerm) {
+      filtered = filtered.filter(user =>
+        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    if (roleFilter !== 'all') {
+      filtered = filtered.filter(user => user.role === roleFilter.toUpperCase());
+    }
+
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(user => 
+        statusFilter === 'active' ? !user.suspended : user.suspended
+      );
+    }
+
+    setFilteredUsers(filtered);
+  };
+
+  const suspendUser = async (userId: number) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/admin/users/${userId}/suspend`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' }
+      const response = await fetch(`http://localhost:8080/api/auth/admin/suspend/${userId}`, {
+        method: 'POST'
       });
       
       if (response.ok) {
         toast({
           title: 'User Suspended',
-          description: `${userName} has been suspended successfully`,
+          description: 'User has been suspended successfully'
         });
-        loadSystemData();
+        loadUsers();
       } else {
-        throw new Error('Failed to suspend user');
+        toast({
+          title: 'Error',
+          description: 'Failed to suspend user',
+          variant: 'destructive'
+        });
       }
     } catch (error) {
       toast({
@@ -103,27 +177,56 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleDeleteUser = async (userId: number, userName: string) => {
-    if (!confirm(`Are you sure you want to permanently delete ${userName}? This action cannot be undone.`)) return;
-    
+  const unsuspendUser = async (userId: number) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/admin/users/${userId}`, {
+      const response = await fetch(`http://localhost:8080/api/auth/admin/unsuspend/${userId}`, {
+        method: 'POST'
+      });
+      
+      if (response.ok) {
+        toast({
+          title: 'User Unsuspended',
+          description: 'User has been unsuspended successfully'
+        });
+        loadUsers();
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to unsuspend user',
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to unsuspend user',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const deleteUser = async (userId: number) => {
+    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:8080/api/auth/admin/delete/${userId}`, {
         method: 'DELETE'
       });
       
       if (response.ok) {
         toast({
           title: 'User Deleted',
-          description: `${userName} has been deleted successfully`,
+          description: 'User has been deleted successfully'
         });
-        setSystemUsers(prev => prev.filter(user => user.id !== userId));
-        // Update stats
-        setSystemStats(prev => ({
-          ...prev,
-          totalUsers: prev.totalUsers - 1
-        }));
+        loadUsers();
       } else {
-        throw new Error('Failed to delete user');
+        toast({
+          title: 'Error',
+          description: 'Failed to delete user',
+          variant: 'destructive'
+        });
       }
     } catch (error) {
       toast({
@@ -134,249 +237,404 @@ const AdminDashboard = () => {
     }
   };
 
-  const exportCSV = () => {
-    toast({
-      title: "Export Started",
-      description: "Downloading system analytics as CSV file...",
-    });
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case 'DOCTOR':
+        return <Stethoscope className="h-4 w-4" />;
+      case 'PHARMACY':
+        return <Building2 className="h-4 w-4" />;
+      case 'PATIENT':
+        return <Heart className="h-4 w-4" />;
+      default:
+        return <Users className="h-4 w-4" />;
+    }
   };
 
-  const COLORS = ['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--warning))', 'hsl(var(--emergency))', 'hsl(var(--accent))'];
-
-  const pieData = mockAnalytics.topMedicines.map((item, index) => ({
-    name: item.name,
-    value: item.requests,
-    color: COLORS[index % COLORS.length]
-  }));
+  const getRoleBadgeVariant = (role: string) => {
+    switch (role) {
+      case 'DOCTOR':
+        return 'default';
+      case 'PHARMACY':
+        return 'secondary';
+      case 'PATIENT':
+        return 'outline';
+      default:
+        return 'outline';
+    }
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
-        <Badge variant="secondary" className="text-emergency">
-          {user?.name}
-        </Badge>
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Manage users and system settings</p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Badge variant="secondary" className="text-primary">
+            <Shield className="h-3 w-3 mr-1" />
+            Administrator
+          </Badge>
+          <Badge variant="outline" className="text-success">
+            <UserCheck className="h-3 w-3 mr-1" />
+            {user?.name}
+          </Badge>
+        </div>
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
+      {/* Stats Cards */}
+      <div className="grid md:grid-cols-6 gap-4">
+        <Card className="shadow-card hover:shadow-medical transition-shadow duration-300">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{stats.totalUsers}</div>
+            <p className="text-xs text-muted-foreground">All registered users</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-card hover:shadow-medical transition-shadow duration-300">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+            <UserCheck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-success">{stats.activeUsers}</div>
+            <p className="text-xs text-muted-foreground">Not suspended</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-card hover:shadow-medical transition-shadow duration-300">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Suspended</CardTitle>
+            <UserX className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-destructive">{stats.suspendedUsers}</div>
+            <p className="text-xs text-muted-foreground">Suspended accounts</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-card hover:shadow-medical transition-shadow duration-300">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Doctors</CardTitle>
+            <Stethoscope className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{stats.doctors}</div>
+            <p className="text-xs text-muted-foreground">Medical professionals</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-card hover:shadow-medical transition-shadow duration-300">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Patients</CardTitle>
+            <Heart className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-pink-600">{stats.patients}</div>
+            <p className="text-xs text-muted-foreground">Registered patients</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-card hover:shadow-medical transition-shadow duration-300">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pharmacies</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{stats.pharmacies}</div>
+            <p className="text-xs text-muted-foreground">Partner pharmacies</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Tabs defaultValue="dashboard" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsTrigger value="users">User Management</TabsTrigger>
+          <TabsTrigger value="settings">System Settings</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid md:grid-cols-4 gap-4">
-            <Card className="shadow-card">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Patients</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-success">{systemStats.totalPatients}</div>
-                <p className="text-xs text-muted-foreground">+8% from last month</p>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-card">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Doctors</CardTitle>
-                <UserCheck className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-primary">{systemStats.totalDoctors}</div>
-                <p className="text-xs text-muted-foreground">+3 new this month</p>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-card">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Partner Pharmacies</CardTitle>
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-warning">{systemStats.totalPharmacies}</div>
-                <p className="text-xs text-muted-foreground">2 pending approval</p>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-card">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Consultations</CardTitle>
-                <Activity className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-emergency">{mockAnalytics.totalConsultations}</div>
-                <p className="text-xs text-muted-foreground">This month</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle>Weekly Consultations</CardTitle>
-                <CardDescription>Number of consultations per day this week</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={mockAnalytics.weeklyConsultations}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="day" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="hsl(var(--primary))" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle>Top Requested Medicines</CardTitle>
-                <CardDescription>Most requested medicines this month</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle>System Health</CardTitle>
-              <CardDescription>Overall platform performance metrics</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-3 gap-4">
-                <div className="text-center p-4 bg-muted rounded-lg">
-                  <div className="text-2xl font-bold text-success">{mockAnalytics.fulfillmentRate}%</div>
-                  <div className="text-sm text-muted-foreground">Request Fulfillment Rate</div>
-                </div>
-                <div className="text-center p-4 bg-muted rounded-lg">
-                  <div className="text-2xl font-bold text-primary">98.5%</div>
-                  <div className="text-sm text-muted-foreground">System Uptime</div>
-                </div>
-                <div className="text-center p-4 bg-muted rounded-lg">
-                  <div className="text-2xl font-bold text-warning">4.8/5</div>
-                  <div className="text-sm text-muted-foreground">User Satisfaction</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         <TabsContent value="users" className="space-y-4">
           <Card className="shadow-card">
             <CardHeader>
               <CardTitle>User Management</CardTitle>
-              <CardDescription>Manage all platform users</CardDescription>
+              <CardDescription>Manage all system users</CardDescription>
+              
+              {/* Filters */}
+              <div className="flex flex-wrap gap-4 mt-4">
+                <div className="flex items-center space-x-2">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search users..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-64"
+                  />
+                </div>
+                
+                <select
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                  className="px-3 py-2 border border-border rounded-md bg-background"
+                >
+                  <option value="all">All Roles</option>
+                  <option value="patient">Patients</option>
+                  <option value="doctor">Doctors</option>
+                  <option value="pharmacy">Pharmacies</option>
+                </select>
+                
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 border border-border rounded-md bg-background"
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="suspended">Suspended</option>
+                </select>
+                
+                <Button onClick={loadUsers} variant="outline" size="sm">
+                  <Activity className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center">Loading users...</TableCell>
-                    </TableRow>
-                  ) : systemUsers.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center">No users found</TableCell>
-                    </TableRow>
+              {loading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="text-muted-foreground mt-2">Loading users...</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredUsers.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground">No users found</p>
+                    </div>
                   ) : (
-                    systemUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.name}</TableCell>
-                        <TableCell>{user.email}</TableCell>
-                        <TableCell>
-                          <Badge variant={
-                            user.role.toLowerCase() === 'doctor' ? 'default' :
-                            user.role.toLowerCase() === 'patient' ? 'secondary' :
-                            user.role.toLowerCase() === 'pharmacy' ? 'outline' : 'destructive'
-                          }>
-                            {user.role.toLowerCase()}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{user.address || user.specialization || user.pharmacyName || 'N/A'}</TableCell>
-                        <TableCell>
-                          <Badge variant="default">Active</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex space-x-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleSuspendUser(user.id, user.name)}
-                            >
-                              Suspend
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleDeleteUser(user.id, user.name)}
-                            >
-                              Delete
-                            </Button>
+                    filteredUsers.map((user) => (
+                      <div key={user.id} className="border border-border rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                              {getRoleIcon(user.role)}
+                            </div>
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <h4 className="font-medium">{user.name}</h4>
+                                <Badge variant={getRoleBadgeVariant(user.role)}>
+                                  {user.role.toLowerCase()}
+                                </Badge>
+                                {user.suspended && (
+                                  <Badge variant="destructive">
+                                    <Ban className="h-3 w-3 mr-1" />
+                                    Suspended
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground">{user.email}</p>
+                              {user.phone && (
+                                <p className="text-xs text-muted-foreground">Phone: {user.phone}</p>
+                              )}
+                              {user.specialization && (
+                                <p className="text-xs text-muted-foreground">Specialization: {user.specialization}</p>
+                              )}
+                              {user.pharmacyName && (
+                                <p className="text-xs text-muted-foreground">Pharmacy: {user.pharmacyName}</p>
+                              )}
+                            </div>
                           </div>
-                        </TableCell>
-                      </TableRow>
+                          
+                          <div className="flex items-center space-x-2">
+                            <Badge variant="outline" className="text-xs">
+                              ID: {user.id}
+                            </Badge>
+                            {user.role !== 'ADMIN' && (
+                              <>
+                                {user.suspended ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => unsuspendUser(user.id)}
+                                    className="hover:bg-success/10"
+                                  >
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Unsuspend
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => suspendUser(user.id)}
+                                    className="hover:bg-warning/10"
+                                  >
+                                    <Ban className="h-3 w-3 mr-1" />
+                                    Suspend
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => deleteUser(user.id)}
+                                  className="hover:scale-105 transition-transform"
+                                >
+                                  <Trash2 className="h-3 w-3 mr-1" />
+                                  Delete
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     ))
                   )}
-                </TableBody>
-              </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
+        <TabsContent value="dashboard" className="space-y-4">
+          {/* Real-time User Activity */}
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <TrendingUp className="h-5 w-5 text-primary animate-pulse" />
+                <span>Live User Activity</span>
+              </CardTitle>
+              <CardDescription>
+                Real-time user engagement and system activity
+                <br />
+                <span className="text-xs text-muted-foreground">
+                  Last updated: {lastUpdated.toLocaleTimeString()} • Auto-refresh: 30s
+                </span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-3 gap-6">
+                <div className="space-y-4">
+                  <h4 className="font-medium flex items-center">
+                    <div className="w-3 h-3 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                    Recent Registrations
+                  </h4>
+                  <div className="space-y-3">
+                    {users.slice(-3).map((user, index) => (
+                      <div key={user.id} className="flex items-center space-x-3 p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-all duration-300 animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+                        <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                          {getRoleIcon(user.role)}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{user.name}</p>
+                          <p className="text-xs text-muted-foreground">{user.role.toLowerCase()}</p>
+                        </div>
+                        <Badge variant="outline" className="text-xs animate-pulse">
+                          New
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <h4 className="font-medium flex items-center">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full mr-2 animate-pulse"></div>
+                    System Health
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="h-4 w-4 text-green-600 animate-pulse" />
+                        <span className="text-sm">Database</span>
+                      </div>
+                      <Badge variant="default" className="bg-green-100 text-green-800">Online</Badge>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="h-4 w-4 text-green-600 animate-pulse" />
+                        <span className="text-sm">API Server</span>
+                      </div>
+                      <Badge variant="default" className="bg-green-100 text-green-800">Healthy</Badge>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <Activity className="h-4 w-4 text-blue-600 animate-pulse" />
+                        <span className="text-sm">Response Time</span>
+                      </div>
+                      <Badge variant="outline" className="text-blue-800">~45ms</Badge>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <h4 className="font-medium flex items-center">
+                    <div className="w-3 h-3 bg-orange-500 rounded-full mr-2 animate-pulse"></div>
+                    Quick Actions
+                  </h4>
+                  <div className="space-y-2">
+                    <Button variant="outline" size="sm" className="w-full justify-start hover:scale-105 transition-transform">
+                      <Users className="h-4 w-4 mr-2" />
+                      View All Users
+                    </Button>
+                    <Button variant="outline" size="sm" className="w-full justify-start hover:scale-105 transition-transform">
+                      <Settings className="h-4 w-4 mr-2" />
+                      System Settings
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full justify-start hover:scale-105 transition-transform" 
+                      onClick={refreshDashboard}
+                      disabled={dashboardLoading}
+                    >
+                      <Activity className={`h-4 w-4 mr-2 ${dashboardLoading ? 'animate-spin' : ''}`} />
+                      {dashboardLoading ? 'Refreshing...' : 'Refresh Data'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* User Statistics with Animations */}
+          <div className="grid md:grid-cols-2 gap-6">
             <Card className="shadow-card">
               <CardHeader>
-                <CardTitle>Platform Growth</CardTitle>
-                <CardDescription>Monthly user registration trends</CardDescription>
+                <CardTitle className="flex items-center space-x-2">
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                  <span>User Growth Trends</span>
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">New Patients</span>
-                    <span className="font-medium text-success">+185 this month</span>
+                    <span className="text-sm font-medium">Total Growth</span>
+                    <div className="flex items-center space-x-2">
+                      <TrendingUp className="h-4 w-4 text-green-600 animate-bounce" />
+                      <span className="text-sm font-bold text-green-600">+12.5%</span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">New Doctors</span>
-                    <span className="font-medium text-primary">+12 this month</span>
+                  <div className="w-full bg-muted rounded-full h-3">
+                    <div className="bg-gradient-to-r from-green-400 to-green-600 h-3 rounded-full animate-pulse" style={{ width: '75%' }}></div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">New Pharmacies</span>
-                    <span className="font-medium text-warning">+5 this month</span>
+                  
+                  <div className="grid grid-cols-3 gap-4 mt-6">
+                    <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="text-lg font-bold text-blue-700 animate-bounce">{stats.doctors}</div>
+                      <div className="text-xs text-blue-600">Doctors</div>
+                    </div>
+                    <div className="text-center p-3 bg-pink-50 rounded-lg border border-pink-200">
+                      <div className="text-lg font-bold text-pink-700 animate-bounce">{stats.patients}</div>
+                      <div className="text-xs text-pink-600">Patients</div>
+                    </div>
+                    <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+                      <div className="text-lg font-bold text-green-700 animate-bounce">{stats.pharmacies}</div>
+                      <div className="text-xs text-green-600">Pharmacies</div>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -384,108 +642,89 @@ const AdminDashboard = () => {
 
             <Card className="shadow-card">
               <CardHeader>
-                <CardTitle>Revenue Analytics</CardTitle>
-                <CardDescription>Platform financial metrics</CardDescription>
+                <CardTitle className="flex items-center space-x-2">
+                  <Clock className="h-5 w-5 text-primary" />
+                  <span>Recent Activity</span>
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Monthly Revenue</span>
-                    <span className="font-medium text-success">₹2,45,680</span>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-3 p-3 bg-green-50 border border-green-200 rounded-lg animate-fade-in">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">New doctor registered</p>
+                      <p className="text-xs text-muted-foreground">Dr. Smith joined - 2 minutes ago</p>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Consultation Fees</span>
-                    <span className="font-medium text-primary">₹1,85,400</span>
+                  <div className="flex items-center space-x-3 p-3 bg-blue-50 border border-blue-200 rounded-lg animate-fade-in" style={{ animationDelay: '100ms' }}>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Patient appointment booked</p>
+                      <p className="text-xs text-muted-foreground">John Doe - 5 minutes ago</p>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Pharmacy Commission</span>
-                    <span className="font-medium text-warning">₹60,280</span>
+                  <div className="flex items-center space-x-3 p-3 bg-purple-50 border border-purple-200 rounded-lg animate-fade-in" style={{ animationDelay: '200ms' }}>
+                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Pharmacy updated inventory</p>
+                      <p className="text-xs text-muted-foreground">MedPlus Pharmacy - 8 minutes ago</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3 p-3 bg-orange-50 border border-orange-200 rounded-lg animate-fade-in" style={{ animationDelay: '300ms' }}>
+                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">System backup completed</p>
+                      <p className="text-xs text-muted-foreground">Automated backup - 15 minutes ago</p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
-
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle>Top Medicines by Demand</CardTitle>
-              <CardDescription>Most requested medicines across the platform</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Medicine</TableHead>
-                    <TableHead>Total Requests</TableHead>
-                    <TableHead>Success Rate</TableHead>
-                    <TableHead>Avg. Price</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mockAnalytics.topMedicines.map((medicine, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{medicine.name}</TableCell>
-                      <TableCell>{medicine.requests}</TableCell>
-                      <TableCell>
-                        <Badge variant="default">{85 + index * 2}%</Badge>
-                      </TableCell>
-                      <TableCell>₹{25 + index * 15}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
         </TabsContent>
 
-        <TabsContent value="reports" className="space-y-4">
+        <TabsContent value="settings" className="space-y-4">
           <Card className="shadow-card">
             <CardHeader>
-              <CardTitle>Generate Reports</CardTitle>
-              <CardDescription>Export platform data and analytics</CardDescription>
+              <CardTitle className="flex items-center space-x-2">
+                <Settings className="h-5 w-5" />
+                <span>System Settings</span>
+              </CardTitle>
+              <CardDescription>Configure system-wide settings</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-3 gap-4">
-                <Button onClick={exportCSV} variant="medical" className="h-20 flex-col space-y-2">
-                  <Download className="h-6 w-6" />
-                  <span>User Report</span>
-                </Button>
-                <Button onClick={exportCSV} variant="outline" className="h-20 flex-col space-y-2">
-                  <TrendingUp className="h-6 w-6" />
-                  <span>Analytics Report</span>
-                </Button>
-                <Button onClick={exportCSV} variant="success" className="h-20 flex-col space-y-2">
-                  <Activity className="h-6 w-6" />
-                  <span>Consultation Report</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle>System Alerts</CardTitle>
-              <CardDescription>Important notifications and issues</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="border border-border rounded-lg p-4 space-y-2">
-                <div className="flex items-center space-x-2">
-                  <AlertCircle className="h-4 w-4 text-warning" />
-                  <span className="font-medium">Low Medicine Stock Alert</span>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="bg-muted/30 p-4 rounded-lg">
+                  <h4 className="font-medium mb-2">System Information</h4>
+                  <div className="grid md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Total Users:</span>
+                      <span className="ml-2 font-medium">{stats.totalUsers}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">System Status:</span>
+                      <span className="ml-2 font-medium text-success">Online</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Database:</span>
+                      <span className="ml-2 font-medium text-success">Connected</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Last Updated:</span>
+                      <span className="ml-2 font-medium">{new Date().toLocaleString()}</span>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  3 pharmacies reported low stock for Azithromycin. Consider reaching out to suppliers.
-                </p>
-              </div>
-              
-              <div className="border border-border rounded-lg p-4 space-y-2">
-                <div className="flex items-center space-x-2">
-                  <AlertCircle className="h-4 w-4 text-success" />
-                  <span className="font-medium">System Performance Normal</span>
+                
+                <div className="bg-warning/10 border border-warning/20 p-4 rounded-lg">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <AlertTriangle className="h-4 w-4 text-warning" />
+                    <span className="font-medium text-warning">Admin Notice</span>
+                  </div>
+                  <p className="text-sm text-warning/80">
+                    You have administrative privileges. Use these powers responsibly to maintain system integrity and user privacy.
+                  </p>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  All systems are running smoothly. No issues detected in the last 24 hours.
-                </p>
               </div>
             </CardContent>
           </Card>

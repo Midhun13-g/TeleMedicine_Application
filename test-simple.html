@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Backend Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        button { padding: 10px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .result { background: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        input { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Simple Backend Test</h1>
+    
+    <h2>1. Health Check</h2>
+    <button onclick="testHealth()">Test Health</button>
+    <div id="healthResult"></div>
+    
+    <h2>2. Register User</h2>
+    <input type="text" id="regName" placeholder="Name" value="Test User">
+    <input type="email" id="regEmail" placeholder="Email" value="test@example.com">
+    <input type="password" id="regPassword" placeholder="Password" value="password123">
+    <select id="regRole">
+        <option value="patient">Patient</option>
+        <option value="doctor">Doctor</option>
+        <option value="admin">Admin</option>
+    </select>
+    <button onclick="testRegister()">Register</button>
+    <div id="registerResult"></div>
+    
+    <h2>3. Login User</h2>
+    <input type="email" id="loginEmail" placeholder="Email" value="test@example.com">
+    <input type="password" id="loginPassword" placeholder="Password" value="password123">
+    <button onclick="testLogin()">Login</button>
+    <button onclick="testAdminLogin()">Login Admin</button>
+    <div id="loginResult"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api';
+
+        async function testHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/health`);
+                const result = await response.json();
+                showResult('healthResult', `✅ Backend is running!\nStatus: ${result.status}\nMessage: ${result.message}`, 'success');
+            } catch (error) {
+                showResult('healthResult', `❌ Backend is not running!\nError: ${error.message}\n\nStart backend with: cd projectbackend && mvn spring-boot:run`, 'error');
+            }
+        }
+
+        async function testRegister() {
+            const userData = {
+                name: document.getElementById('regName').value,
+                email: document.getElementById('regEmail').value,
+                password: document.getElementById('regPassword').value,
+                role: document.getElementById('regRole').value,
+                phone: '1234567890',
+                address: 'Test Address'
+            };
+
+            if (userData.role === 'admin') {
+                userData.adminKey = 'TELEASHA_ADMIN_2024';
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResult('registerResult', `✅ Registration successful!\nUser: ${result.user.name}\nRole: ${result.user.role}`, 'success');
+                } else {
+                    showResult('registerResult', `❌ Registration failed!\nError: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('registerResult', `❌ Network error!\nError: ${error.message}`, 'error');
+            }
+        }
+
+        async function testLogin() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResult('loginResult', `✅ Login successful!\nUser: ${result.user.name}\nRole: ${result.user.role}\nID: ${result.user.id}`, 'success');
+                } else {
+                    showResult('loginResult', `❌ Login failed!\nError: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('loginResult', `❌ Network error!\nError: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAdminLogin() {
+            document.getElementById('loginEmail').value = 'admin@teleasha.com';
+            document.getElementById('loginPassword').value = 'admin123';
+            await testLogin();
+        }
+
+        function showResult(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = message;
+            element.className = `result ${type}`;
+        }
+
+        // Auto-test health on page load
+        window.onload = function() {
+            testHealth();
+        };
+    </script>
+</body>
+</html>

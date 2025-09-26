@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.HashMap;
 
 @RestController
-@RequestMapping({"/api/auth", "/api/admin"})
+@RequestMapping("/api/auth")
 @CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"}, allowCredentials = "true")
 public class AuthController {
 
@@ -27,6 +27,15 @@ public class AuthController {
             User user = userService.authenticate(email, password);
             
             if (user != null) {
+                if (user.isSuspended()) {
+                    System.out.println("Login blocked - user suspended: " + user.getEmail());
+                    return ResponseEntity.badRequest().body(Map.of(
+                        "success", false, 
+                        "message", "Your account has been suspended by an administrator. Please contact support.",
+                        "suspended", true
+                    ));
+                }
+                
                 System.out.println("Login successful for user: " + user.getName());
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
@@ -65,6 +74,15 @@ public class AuthController {
             if (userService.existsByEmail(email)) {
                 System.out.println("Registration failed: Email already exists - " + email);
                 return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Email already exists"));
+            }
+            
+            // Check admin key for admin registration
+            if ("admin".equalsIgnoreCase(roleStr)) {
+                String adminKey = (String) userData.get("adminKey");
+                if (!"TELEASHA_ADMIN_2024".equals(adminKey)) {
+                    System.out.println("Registration failed: Invalid admin key - " + email);
+                    return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid admin key"));
+                }
             }
             
             User.Role role = User.Role.valueOf(roleStr.toUpperCase());
@@ -186,79 +204,121 @@ public class AuthController {
         }
     }
 
-    @DeleteMapping("/users/{userId}")
-    public ResponseEntity<?> deleteUser(@PathVariable Long userId) {
-        try {
-            User user = userService.findById(userId);
-            if (user == null) {
-                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "User not found"));
-            }
-            
-            userService.deleteUser(userId);
-            return ResponseEntity.ok(Map.of("success", true, "message", "User deleted successfully"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Failed to delete user: " + e.getMessage()));
-        }
-    }
 
-    @PutMapping("/users/{userId}/suspend")
-    public ResponseEntity<?> suspendUser(@PathVariable Long userId) {
-        try {
-            User user = userService.findById(userId);
-            if (user == null) {
-                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "User not found"));
-            }
-            
-            userService.suspendUser(userId);
-            return ResponseEntity.ok(Map.of("success", true, "message", "User suspended successfully"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Failed to suspend user: " + e.getMessage()));
-        }
-    }
     
-    @PutMapping("/users/{userId}/unsuspend")
-    public ResponseEntity<?> unsuspendUser(@PathVariable Long userId) {
+    @PostMapping("/admin/suspend/{userId}")
+    public ResponseEntity<Map<String, Object>> suspendUser(@PathVariable Long userId) {
         try {
-            User user = userService.findById(userId);
-            if (user == null) {
-                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "User not found"));
+            User suspendedUser = userService.suspendUser(userId);
+            if (suspendedUser != null) {
+                return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "User suspended successfully",
+                    "user", Map.of(
+                        "id", suspendedUser.getId(),
+                        "name", suspendedUser.getName(),
+                        "suspended", suspendedUser.isSuspended()
+                    )
+                ));
+            } else {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "User not found or cannot be suspended"
+                ));
             }
-            
-            userService.unsuspendUser(userId);
-            return ResponseEntity.ok(Map.of("success", true, "message", "User unsuspended successfully"));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Failed to unsuspend user: " + e.getMessage()));
-        }
-    }
-
-    @GetMapping("/stats")
-    public ResponseEntity<?> getSystemStats() {
-        try {
-            var users = userService.getAllUsers();
-            if (users == null) {
-                users = new java.util.ArrayList<>();
-            }
-            
-            long totalPatients = users.stream().filter(u -> u.getRole() == User.Role.PATIENT).count();
-            long totalDoctors = users.stream().filter(u -> u.getRole() == User.Role.DOCTOR).count();
-            long totalPharmacies = users.stream().filter(u -> u.getRole() == User.Role.PHARMACY).count();
-            long totalAdmins = users.stream().filter(u -> u.getRole() == User.Role.ADMIN).count();
-            
-            return ResponseEntity.ok(Map.of(
-                "totalUsers", users.size(),
-                "totalPatients", (int)totalPatients,
-                "totalDoctors", (int)totalDoctors,
-                "totalPharmacies", (int)totalPharmacies,
-                "totalAdmins", (int)totalAdmins
+            return ResponseEntity.status(500).body(Map.of(
+                "success", false,
+                "message", "Failed to suspend user: " + e.getMessage()
             ));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Failed to fetch stats: " + e.getMessage()));
         }
     }
-    
+
+    @PostMapping("/admin/unsuspend/{userId}")
+    public ResponseEntity<Map<String, Object>> unsuspendUser(@PathVariable Long userId) {
+        try {
+            User unsuspendedUser = userService.unsuspendUser(userId);
+            if (unsuspendedUser != null) {
+                return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "User unsuspended successfully",
+                    "user", Map.of(
+                        "id", unsuspendedUser.getId(),
+                        "name", unsuspendedUser.getName(),
+                        "suspended", unsuspendedUser.isSuspended()
+                    )
+                ));
+            } else {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "User not found"
+                ));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of(
+                "success", false,
+                "message", "Failed to unsuspend user: " + e.getMessage()
+            ));
+        }
+    }
+
+    @DeleteMapping("/admin/delete/{userId}")
+    public ResponseEntity<Map<String, Object>> deleteUser(@PathVariable Long userId) {
+        try {
+            User user = userService.findById(userId);
+            if (user != null && user.isSuspended()) {
+                boolean deleted = userService.deleteUser(userId);
+                if (deleted) {
+                    return ResponseEntity.ok(Map.of(
+                        "success", true,
+                        "message", "User deleted successfully"
+                    ));
+                } else {
+                    return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "User not found or cannot be deleted"
+                    ));
+                }
+            } else {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Only suspended users can be deleted"
+                ));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of(
+                "success", false,
+                "message", "Failed to delete user: " + e.getMessage()
+            ));
+        }
+    }
+
+    @GetMapping("/check-status/{userId}")
+    public ResponseEntity<Map<String, Object>> checkUserStatus(@PathVariable Long userId) {
+        try {
+            User user = userService.findById(userId);
+            if (user != null) {
+                return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "suspended", user.isSuspended(),
+                    "active", !user.isSuspended()
+                ));
+            } else {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "User not found"
+                ));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of(
+                "success", false,
+                "message", "Failed to check user status: " + e.getMessage()
+            ));
+        }
+    }
+
     @GetMapping("/health")
     public ResponseEntity<?> healthCheck() {
-        return ResponseEntity.ok(Map.of("status", "OK", "message", "Admin API is running"));
+        return ResponseEntity.ok(Map.of("status", "OK", "message", "Auth API is running"));
     }
 }

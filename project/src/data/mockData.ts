@@ -31,15 +31,7 @@ export const demoUsers: User[] = [
     location: 'Mehsana District, Gujarat',
     phone: '+91 9876543212'
   },
-  {
-    id: '4',
-    email: 'admin@demo.com',
-    password: '12345',
-    name: 'Rajesh Barik',
-    role: 'admin',
-    location: 'Telemedicine HQ',
-    phone: '+91 9876543213'
-  }
+
 ];
 
 // Mock appointments

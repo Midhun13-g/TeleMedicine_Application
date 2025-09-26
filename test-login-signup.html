@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login/Signup Test - TeleAsha</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        input, select { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 4px; width: 200px; }
+        .result { background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 4px; margin-top: 10px; white-space: pre-wrap; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 TeleAsha Login/Signup Test</h1>
+        <p>Test the authentication system functionality</p>
+    </div>
+
+    <div class="container">
+        <h2>📝 Register New User</h2>
+        <input type="text" id="regName" placeholder="Full Name" value="Test User">
+        <input type="email" id="regEmail" placeholder="Email" value="test@example.com">
+        <input type="password" id="regPassword" placeholder="Password" value="password123">
+        <select id="regRole">
+            <option value="patient">Patient</option>
+            <option value="doctor">Doctor</option>
+            <option value="pharmacy">Pharmacy</option>
+            <option value="admin">Admin</option>
+        </select>
+        <input type="text" id="regPhone" placeholder="Phone" value="1234567890">
+        <input type="text" id="regAddress" placeholder="Address" value="Test Address">
+        <input type="password" id="adminKey" placeholder="Admin Key (if admin)" value="TELEASHA_ADMIN_2024" style="display:none;">
+        <br>
+        <button onclick="testRegister()">Register User</button>
+        <div id="registerResult" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="container">
+        <h2>🔑 Login Test</h2>
+        <input type="email" id="loginEmail" placeholder="Email" value="test@example.com">
+        <input type="password" id="loginPassword" placeholder="Password" value="password123">
+        <button onclick="testLogin()">Login</button>
+        <button onclick="testAdminLogin()">Login as Admin</button>
+        <div id="loginResult" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="container">
+        <h2>🧪 Quick Tests</h2>
+        <button onclick="testPatientRegister()">Register Test Patient</button>
+        <button onclick="testDoctorRegister()">Register Test Doctor</button>
+        <button onclick="testSuspendedLogin()">Test Suspended User Login</button>
+        <button onclick="checkBackendHealth()">Check Backend Health</button>
+        <div id="quickTestResult" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api';
+
+        // Show/hide admin key field based on role selection
+        document.getElementById('regRole').addEventListener('change', function() {
+            const adminKeyField = document.getElementById('adminKey');
+            if (this.value === 'admin') {
+                adminKeyField.style.display = 'block';
+            } else {
+                adminKeyField.style.display = 'none';
+            }
+        });
+
+        async function testRegister() {
+            const name = document.getElementById('regName').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const role = document.getElementById('regRole').value;
+            const phone = document.getElementById('regPhone').value;
+            const address = document.getElementById('regAddress').value;
+            const adminKey = document.getElementById('adminKey').value;
+
+            const userData = {
+                name, email, password, role, phone, address
+            };
+
+            if (role === 'admin') {
+                userData.adminKey = adminKey;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+
+                const result = await response.json();
+                const resultDiv = document.getElementById('registerResult');
+                resultDiv.style.display = 'block';
+
+                if (result.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `✅ Registration Successful!\n\nUser Details:\n${JSON.stringify(result.user, null, 2)}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `❌ Registration Failed: ${result.message}`;
+                }
+            } catch (error) {
+                const resultDiv = document.getElementById('registerResult');
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Network Error: ${error.message}`;
+            }
+        }
+
+        async function testLogin() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const result = await response.json();
+                const resultDiv = document.getElementById('loginResult');
+                resultDiv.style.display = 'block';
+
+                if (result.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `✅ Login Successful!\n\nUser Details:\n${JSON.stringify(result.user, null, 2)}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `❌ Login Failed: ${result.message}`;
+                }
+            } catch (error) {
+                const resultDiv = document.getElementById('loginResult');
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Network Error: ${error.message}`;
+            }
+        }
+
+        async function testAdminLogin() {
+            document.getElementById('loginEmail').value = 'admin@teleasha.com';
+            document.getElementById('loginPassword').value = 'admin123';
+            await testLogin();
+        }
+
+        async function testPatientRegister() {
+            const userData = {
+                name: 'Test Patient',
+                email: `patient${Date.now()}@test.com`,
+                password: 'password123',
+                role: 'patient',
+                phone: '1234567890',
+                address: 'Test Patient Address'
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+
+                const result = await response.json();
+                showQuickTestResult(result.success ? 
+                    `✅ Patient registered: ${userData.email}` : 
+                    `❌ Failed: ${result.message}`);
+            } catch (error) {
+                showQuickTestResult(`❌ Error: ${error.message}`);
+            }
+        }
+
+        async function testDoctorRegister() {
+            const userData = {
+                name: 'Test Doctor',
+                email: `doctor${Date.now()}@test.com`,
+                password: 'password123',
+                role: 'doctor',
+                phone: '1234567890',
+                address: 'Test Doctor Address',
+                specialization: 'General Medicine',
+                licenseNumber: 'DOC123456'
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+
+                const result = await response.json();
+                showQuickTestResult(result.success ? 
+                    `✅ Doctor registered: ${userData.email}` : 
+                    `❌ Failed: ${result.message}`);
+            } catch (error) {
+                showQuickTestResult(`❌ Error: ${error.message}`);
+            }
+        }
+
+        async function testSuspendedLogin() {
+            // This would test a suspended user - you'd need to suspend a user first via admin
+            showQuickTestResult('ℹ️ To test suspended login:\n1. Register a user\n2. Suspend them via admin dashboard\n3. Try to login with their credentials');
+        }
+
+        async function checkBackendHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/health`);
+                const result = await response.json();
+                showQuickTestResult(`✅ Backend Health: ${result.status}\nMessage: ${result.message}`);
+            } catch (error) {
+                showQuickTestResult(`❌ Backend Offline: ${error.message}\n\nMake sure to start the backend server:\ncd projectbackend\nmvn spring-boot:run`);
+            }
+        }
+
+        function showQuickTestResult(message) {
+            const resultDiv = document.getElementById('quickTestResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = message.includes('✅') ? 'result success' : 'result error';
+            resultDiv.innerHTML = message;
+        }
+
+        // Auto-check backend health on page load
+        window.onload = function() {
+            checkBackendHealth();
+        };
+    </script>
+</body>
+</html>

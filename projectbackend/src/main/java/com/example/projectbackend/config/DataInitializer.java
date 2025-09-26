@@ -24,7 +24,14 @@ public class DataInitializer implements CommandLineRunner {
     }
     
     private void initializeUsers() {
-        // No dummy users - users will register themselves
+        // Create default admin account if it doesn't exist
+        if (!userService.existsByEmail("admin@teleasha.com")) {
+            User admin = new User("admin@teleasha.com", "admin123", "System Administrator", User.Role.ADMIN);
+            admin.setPhone("+91-9999999999");
+            admin.setAddress("TeleAsha Headquarters, Gujarat, India");
+            userService.save(admin);
+            System.out.println("✅ Default admin account created: admin@teleasha.com / admin123");
+        }
     }
     
     private void initializeMedicines() {

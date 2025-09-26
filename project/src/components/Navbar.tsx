@@ -28,12 +28,7 @@ const Navbar: React.FC<NavbarProps> = ({ userType, userName }) => {
                     { name: 'Reschedule Requests', href: '/doctor/reschedule-requests', icon: '🔄' },
                     { name: 'Availability', href: '/doctor/availability', icon: '⏰' }
                 ];
-            case 'ADMIN':
-                return [
-                    { name: 'Dashboard', href: '/admin/dashboard', icon: '🏠' },
-                    { name: 'Scheduling', href: '/admin/scheduling', icon: '📊' },
-                    { name: 'Reports', href: '/admin/reports', icon: '📈' }
-                ];
+
             default:
                 return [];
         }
@@ -43,7 +38,7 @@ const Navbar: React.FC<NavbarProps> = ({ userType, userName }) => {
         switch (userType) {
             case 'PATIENT': return 'bg-blue-600';
             case 'DOCTOR': return 'bg-green-600';
-            case 'ADMIN': return 'bg-purple-600';
+
             default: return 'bg-gray-600';
         }
     };

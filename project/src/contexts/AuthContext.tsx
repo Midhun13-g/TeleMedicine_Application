@@ -18,7 +18,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<{success: boolean, message?: string}> => {
     try {
       console.log('🔐 Attempting login for:', email);
       const response = await fetch('http://localhost:8080/api/auth/login', {
@@ -35,7 +35,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ Login failed:', response.status, errorText);
-        return false;
+        return {success: false, message: 'Login failed'};
       }
       
       const data = await response.json();
@@ -45,13 +45,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(data.user);
         localStorage.setItem('user', JSON.stringify(data.user));
         console.log('🎉 Login successful for user:', data.user.name, 'Role:', data.user.role);
-        return true;
+        return {success: true};
       }
-      console.log('❌ Login failed: Invalid response format');
-      return false;
+      console.log('❌ Login failed:', data.message);
+      return {success: false, message: data.message};
     } catch (error) {
       console.error('💥 Login error:', error);
-      return false;
+      return {success: false, message: 'Network error. Please check if the backend server is running.'};
     }
   };
 
@@ -129,6 +129,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(JSON.parse(storedUser));
     }
   }, []);
+
+  React.useEffect(() => {
+    if (!user?.id) return;
+
+    const checkSuspension = async () => {
+      try {
+        const response = await fetch(`http://localhost:8080/api/auth/check-status/${user.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.suspended) {
+            alert('🚫 Your account has been suspended by an administrator. You will be logged out now.');
+            logout();
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check suspension status:', error);
+      }
+    };
+
+    const interval = setInterval(checkSuspension, 10000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
 
   return (
     <AuthContext.Provider

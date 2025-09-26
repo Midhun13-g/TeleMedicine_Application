@@ -155,8 +155,7 @@ const translations = {
     contactPatient: 'Contact Patient',
     suggestAlternative: 'Suggest Alternative',
 
-    // Admin
-    adminDashboard: 'Admin Dashboard',
+
     activePatients: 'Active Patients',
     activeDoctors: 'Active Doctors',
     partnerPharmacies: 'Partner Pharmacies',
@@ -189,7 +188,7 @@ const translations = {
     patient: 'Patient',
     doctor: 'Doctor',
     pharmacy: 'Pharmacy',
-    admin: 'Admin',
+
     active: 'Active',
     inactive: 'Inactive',
     emergency: 'Emergency',
@@ -280,7 +279,7 @@ const translations = {
     patient: 'நோயாளி',
     doctor: 'மருத்துவர்',
     pharmacy: 'மருந்தகம்',
-    admin: 'நிர்வாகி',
+
     active: 'செயலில்',
     inactive: 'செயலில் இல்லை',
     emergency: 'அவசரம்',
@@ -371,7 +370,7 @@ const translations = {
     patient: 'मरीज़',
     doctor: 'डॉक्टर',
     pharmacy: 'फार्मेसी',
-    admin: 'एडमिन',
+
     active: 'सक्रिय',
     inactive: 'निष्क्रिय',
     emergency: 'आपातकाल',
@@ -462,7 +461,7 @@ const translations = {
     patient: 'દર્દી',
     doctor: 'ડૉક્ટર',
     pharmacy: 'ફાર્મસી',
-    admin: 'એડમિન',
+
     active: 'સક્રિય',
     inactive: 'નિષ્ક્રિય',
     emergency: 'કટોકટી',
