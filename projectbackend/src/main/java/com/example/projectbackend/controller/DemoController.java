@@ -109,7 +109,7 @@ public class DemoController {
                     Map.of("email", "patient1@teleasha.com", "password", "password123", "role", "patient"),
                     Map.of("email", "patient2@teleasha.com", "password", "password123", "role", "patient"),
                     Map.of("email", "patient3@teleasha.com", "password", "password123", "role", "patient")
-                ),
+                )
 
             )
         );

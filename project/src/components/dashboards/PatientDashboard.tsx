@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Clock, User, Pill, Search, CheckCircle, AlertCircle, FileText, Heart, Activity, Video, AudioLines, MapPin, Star, Send, Bot, Stethoscope, ExternalLink, Settings, Edit, Save, X, Bell, Mail, Smartphone, Moon, Globe, Zap } from 'lucide-react';
+import { Calendar, Clock, User, Pill, Search, CheckCircle, AlertCircle, FileText, Heart, Activity, Video, AudioLines, MapPin, Star, Send, Bot, Stethoscope, ExternalLink, Settings, Edit, Save, X, Bell, Mail, Smartphone, Moon, Globe, Zap, AlertTriangle, Building2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { symptomService, type SymptomResult } from '@/services/symptomService';
@@ -85,6 +85,46 @@ const PatientDashboard = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [appointmentFilter, setAppointmentFilter] = useState('all');
+  const [reportForm, setReportForm] = useState({
+    reportType: 'fake-doctor',
+    userIdOrName: '',
+    issueType: 'fake-profile',
+    rating: 0,
+    description: ''
+  });
+  const [userReports, setUserReports] = useState([]);
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  
+  const loadUserReports = async () => {
+    if (user?.id) {
+      try {
+        console.log(`🔄 Loading reports for user: ${user.id}`);
+        const response = await fetch(`http://localhost:8080/api/reports/user/${user.id}`);
+        if (response.ok) {
+          const reports = await response.json();
+          console.log(`📋 Loaded ${reports.length} reports for user ${user.id}`);
+          setUserReports(reports);
+        } else {
+          console.error('Failed to load user reports - response not ok:', response.status);
+        }
+      } catch (error) {
+        console.error('Failed to load user reports:', error);
+      }
+    }
+  };
+  
+  useEffect(() => {
+    if (user?.id) {
+      loadUserReports();
+      
+      // Auto-refresh every 3 seconds
+      const interval = setInterval(() => {
+        loadUserReports();
+      }, 3000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (user?.id) {
@@ -230,6 +270,24 @@ const PatientDashboard = () => {
         title: 'Doctor Info Updated',
         description: `Dr. ${doctorInfo.name}'s information has been updated`,
       });
+    });
+    
+    // Listen for report updates
+    socketConnection.on('report_status_updated', (data) => {
+      if (String(data.reporterId) === String(user?.id)) {
+        setUserReports(prev => prev.map(report => 
+          report.id === data.reportId ? { ...report, status: data.status } : report
+        ));
+        if (data.status !== 'PENDING') {
+          toast({ title: 'Report Updated', description: `#${data.reportId}: ${data.status}` });
+        }
+      }
+    });
+    
+    socketConnection.on('reports_global_update', (data) => {
+      if (String(data.reporterId) === String(user?.id)) {
+        loadUserReports();
+      }
     });
     
     // Listen for new prescriptions
@@ -653,12 +711,13 @@ const PatientDashboard = () => {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview">{t('overview')}</TabsTrigger>
           <TabsTrigger value="symptoms">{t('symptoms')}</TabsTrigger>
           <TabsTrigger value="appointments">{t('appointments')}</TabsTrigger>
           <TabsTrigger value="prescriptions">Prescriptions</TabsTrigger>
           <TabsTrigger value="medicines">Medicine Availability</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -1513,6 +1572,280 @@ const PatientDashboard = () => {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reports" className="space-y-4">
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <AlertTriangle className="h-5 w-5 text-warning" />
+                <span>Report User to Admin</span>
+              </CardTitle>
+              <CardDescription>
+                Report fake doctors, pharmacies, or inappropriate users. All reports are reviewed by admin.
+                <br />
+                <span className="text-xs text-muted-foreground mt-1 block">
+                  💡 Tip: Provide detailed information to help admin investigate effectively
+                </span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Report Type</label>
+                <select 
+                  className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                  value={reportForm.reportType}
+                  onChange={(e) => setReportForm(prev => ({ ...prev, reportType: e.target.value }))}
+                >
+                  <option value="fake-doctor">Fake Doctor</option>
+                  <option value="fake-pharmacy">Fake Pharmacy</option>
+                  <option value="doctor-feedback">Doctor Feedback</option>
+                  <option value="inappropriate-user">Inappropriate User</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">User ID or Name</label>
+                <Input 
+                  placeholder="Enter user ID or name" 
+                  value={reportForm.userIdOrName}
+                  onChange={(e) => setReportForm(prev => ({ ...prev, userIdOrName: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Issue Details</label>
+                <select 
+                  className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                  value={reportForm.issueType}
+                  onChange={(e) => setReportForm(prev => ({ ...prev, issueType: e.target.value }))}
+                >
+                  <option value="fake-profile">Fake Profile/Credentials</option>
+                  <option value="inappropriate-behavior">Inappropriate Behavior</option>
+                  <option value="spam">Spam/Unwanted Messages</option>
+                  <option value="poor-service">Poor Service Quality</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Rating (if applicable)</label>
+                <div className="flex space-x-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star 
+                      key={star} 
+                      className={`h-6 w-6 cursor-pointer hover:fill-current ${
+                        star <= reportForm.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
+                      }`}
+                      onClick={() => setReportForm(prev => ({ ...prev, rating: star }))}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Description</label>
+                <Textarea 
+                  placeholder="Describe the issue in detail..." 
+                  rows={4}
+                  value={reportForm.description}
+                  onChange={(e) => setReportForm(prev => ({ ...prev, description: e.target.value }))}
+                />
+              </div>
+              <Button 
+                variant="destructive" 
+                className="w-full"
+                disabled={isSubmittingReport}
+                onClick={async () => {
+                  if (!reportForm.userIdOrName.trim() || !reportForm.description.trim()) {
+                    toast({
+                      title: 'Missing Information',
+                      description: 'Please fill in user ID/name and description',
+                      variant: 'destructive'
+                    });
+                    return;
+                  }
+                  
+                  try {
+                    const reportData = {
+                      reporterId: user?.id,
+                      reporterName: user?.name,
+                      reporterType: 'PATIENT',
+                      reportType: reportForm.reportType,
+                      reportedUserIdOrName: reportForm.userIdOrName,
+                      issueType: reportForm.issueType,
+                      rating: reportForm.rating,
+                      description: reportForm.description,
+                      timestamp: new Date().toISOString()
+                    };
+                    
+                    setIsSubmittingReport(true);
+                    console.log('Submitting report:', reportData);
+                    
+                    // Add to local state immediately
+                    const tempReport = { ...reportData, id: 'temp_' + Date.now(), status: 'PENDING' };
+                    setUserReports(prev => [tempReport, ...prev]);
+                    
+                    try {
+                      const response = await fetch('http://localhost:8080/api/reports/submit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(reportData)
+                      });
+                      
+                      const result = await response.json();
+                      
+                      if (result.success) {
+                        if (socket?.connected) {
+                          socket.emit('user_report', { ...reportData, reportId: result.reportId });
+                        }
+                        
+                        toast({
+                          title: '✅ Report Submitted',
+                          description: `Report #${result.reportId} submitted`,
+                        });
+                        
+                        setReportForm({ reportType: 'fake-doctor', userIdOrName: '', issueType: 'fake-profile', rating: 0, description: '' });
+                        setUserReports(prev => prev.filter(r => r.id !== tempReport.id));
+                        loadUserReports();
+                      } else {
+                        setUserReports(prev => prev.filter(r => r.id !== tempReport.id));
+                        toast({ title: 'Failed', description: result.message, variant: 'destructive' });
+                      }
+                    } catch (error) {
+                      setUserReports(prev => prev.filter(r => r.id !== tempReport.id));
+                      throw error;
+                    }
+                  } catch (error) {
+                    console.error('Report submission error:', error);
+                    toast({
+                      title: 'Error',
+                      description: 'Failed to submit report. Please try again.',
+                      variant: 'destructive'
+                    });
+                  } finally {
+                    setIsSubmittingReport(false);
+                  }
+                }}
+              >
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                {isSubmittingReport ? 'Submitting...' : 'Submit Report to Admin'}
+              </Button>
+            </CardContent>
+          </Card>
+          
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>My Reports ({userReports.length})</span>
+                <Button 
+                  onClick={loadUserReports}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Activity className="h-4 w-4 mr-1" />
+                  Refresh
+                </Button>
+              </CardTitle>
+              <CardDescription>Track your submitted reports and their status</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {userReports.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="bg-muted/30 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                    <FileText className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <p className="text-muted-foreground mb-2">No reports submitted yet</p>
+                  <p className="text-sm text-muted-foreground">Your reports will appear here once submitted</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {userReports.map((report) => (
+                    <div key={report.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                            <AlertTriangle className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <span className="font-medium text-lg">Report #{report.id}</span>
+                            <p className="text-sm text-muted-foreground capitalize">
+                              {report.reportType.replace('-', ' ')}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <Badge 
+                            variant={
+                              report.status === 'PENDING' ? 'secondary' : 
+                              report.status === 'REVIEWED' ? 'default' : 
+                              report.status === 'RESOLVED' ? 'outline' : 'secondary'
+                            }
+                            className="mb-1"
+                          >
+                            {report.status}
+                          </Badge>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(report.timestamp).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-muted/30 p-3 rounded-lg mb-3">
+                        <p className="text-sm font-medium mb-1">Reported User:</p>
+                        <p className="text-sm text-muted-foreground">{report.reportedUserIdOrName}</p>
+                      </div>
+                      
+                      <div className="bg-muted/30 p-3 rounded-lg mb-3">
+                        <p className="text-sm font-medium mb-1">Issue Type:</p>
+                        <p className="text-sm text-muted-foreground capitalize">
+                          {report.issueType?.replace('-', ' ')}
+                        </p>
+                      </div>
+                      
+                      {report.rating && (
+                        <div className="bg-muted/30 p-3 rounded-lg mb-3">
+                          <p className="text-sm font-medium mb-1">Rating:</p>
+                          <div className="flex items-center space-x-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star 
+                                key={star} 
+                                className={`h-4 w-4 ${
+                                  star <= report.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
+                                }`} 
+                              />
+                            ))}
+                            <span className="text-sm text-muted-foreground ml-2">
+                              {report.rating}/5
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                        <p className="text-sm font-medium mb-1 text-blue-800">Description:</p>
+                        <p className="text-sm text-blue-700">{report.description}</p>
+                      </div>
+                      
+                      <div className="flex justify-between items-center mt-3 pt-3 border-t">
+                        <div className="flex items-center space-x-2">
+                          <div className={`w-2 h-2 rounded-full ${
+                            report.status === 'PENDING' ? 'bg-yellow-500 animate-pulse' :
+                            report.status === 'REVIEWED' ? 'bg-blue-500' :
+                            report.status === 'RESOLVED' ? 'bg-green-500' : 'bg-gray-400'
+                          }`}></div>
+                          <span className="text-xs text-muted-foreground">
+                            {report.status === 'PENDING' ? 'Waiting for admin review' :
+                             report.status === 'REVIEWED' ? 'Under investigation' :
+                             report.status === 'RESOLVED' ? 'Issue resolved' : 'Status unknown'}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          Submitted {new Date(report.timestamp).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>

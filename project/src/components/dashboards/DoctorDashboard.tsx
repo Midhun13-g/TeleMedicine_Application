@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Calendar, Clock, User, FileText, Video, AudioLines, CheckCircle, XCircle, Users, Stethoscope, Award, TrendingUp, MessageSquare, Power, PowerOff, AlertCircle, Edit, Save, X, Settings, Bell, Mail, Smartphone, Moon, Globe } from 'lucide-react';
+import { Calendar, Clock, User, FileText, Video, AudioLines, CheckCircle, XCircle, Users, Stethoscope, Award, TrendingUp, MessageSquare, Power, PowerOff, AlertCircle, Edit, Save, X, Settings, Bell, Mail, Smartphone, Moon, Globe, AlertTriangle, Activity } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { mockAppointments } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
@@ -66,6 +66,32 @@ const DoctorDashboard = () => {
   const [callPatientInfo, setCallPatientInfo] = useState<{id: string, name: string} | null>(null);
   const [lastCheckedNotifications, setLastCheckedNotifications] = useState<string[]>([]);
   const [appointmentFilter, setAppointmentFilter] = useState('all');
+  const [userReportForm, setUserReportForm] = useState({
+    userType: 'patient',
+    userIdOrName: '',
+    issueType: 'inappropriate',
+    description: ''
+  });
+  const [isSubmittingUserReport, setIsSubmittingUserReport] = useState(false);
+  const [doctorReports, setDoctorReports] = useState([]);
+  
+  const loadDoctorReports = async () => {
+    if (user?.id) {
+      try {
+        console.log(`🔄 Loading reports for doctor: ${user.id}`);
+        const response = await fetch(`http://localhost:8080/api/reports/user/${user.id}`);
+        if (response.ok) {
+          const reports = await response.json();
+          console.log(`📋 Loaded ${reports.length} reports for doctor ${user.id}`);
+          setDoctorReports(reports);
+        } else {
+          console.error('Failed to load doctor reports - response not ok:', response.status);
+        }
+      } catch (error) {
+        console.error('Failed to load doctor reports:', error);
+      }
+    }
+  };
 
   const [doctorAppointments, setDoctorAppointments] = useState<any[]>([]);
   const pendingCount = doctorAppointments.filter(apt => apt.status === 'pending').length;
@@ -96,6 +122,19 @@ const DoctorDashboard = () => {
     return () => clearInterval(interval);
   }, [user?.id]);
   
+  useEffect(() => {
+    if (user?.id) {
+      loadDoctorReports();
+      
+      // Auto-refresh every 3 seconds
+      const interval = setInterval(() => {
+        loadDoctorReports();
+      }, 3000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [user?.id]);
+  
   // Initialize socket connection and doctor presence
   useEffect(() => {
     if (!user?.id) return;
@@ -108,6 +147,9 @@ const DoctorDashboard = () => {
     socketConnection.on('connect', () => {
       setConnectionStatus('connected');
       console.log('✅ Doctor connected to call server');
+      
+      // Subscribe for report updates
+      socketConnection.emit('doctor_subscribe', { doctorId: user.id });
     });
     
     socketConnection.on('disconnect', () => {
@@ -128,6 +170,24 @@ const DoctorDashboard = () => {
         title: 'New Consultation Request',
         description: `Patient ${data.patientInfo?.name || data.patientId} is requesting a ${data.consultationType} consultation`,
       });
+    });
+    
+    // Listen for report updates
+    socketConnection.on('report_status_updated', (data) => {
+      if (String(data.reporterId) === String(user?.id)) {
+        setDoctorReports(prev => prev.map(report => 
+          report.id === data.reportId ? { ...report, status: data.status } : report
+        ));
+        if (data.status !== 'PENDING') {
+          toast({ title: 'Report Updated', description: `#${data.reportId}: ${data.status}` });
+        }
+      }
+    });
+    
+    socketConnection.on('reports_global_update', (data) => {
+      if (String(data.reporterId) === String(user?.id)) {
+        loadDoctorReports();
+      }
     });
     
     // Listen for medicine taken notifications
@@ -705,11 +765,12 @@ const DoctorDashboard = () => {
       )}
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">{t('overview')}</TabsTrigger>
           <TabsTrigger value="appointments">{t('appointments')}</TabsTrigger>
           <TabsTrigger value="prescriptions">{t('prescriptions')}</TabsTrigger>
-          <TabsTrigger value="messages">Messages</TabsTrigger>
+          <TabsTrigger value="user-reports">Report User</TabsTrigger>
+          <TabsTrigger value="my-reports">My Reports</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -1203,22 +1264,233 @@ const DoctorDashboard = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="messages" className="space-y-4">
+
+
+        <TabsContent value="user-reports" className="space-y-4">
           <Card className="shadow-card">
             <CardHeader>
-              <CardTitle>Patient Messages</CardTitle>
-              <CardDescription>Communicate with your patients</CardDescription>
+              <CardTitle className="flex items-center space-x-2">
+                <AlertTriangle className="h-5 w-5 text-warning" />
+                <span>Report Unwanted User</span>
+              </CardTitle>
+              <CardDescription>Report suspicious or inappropriate user behavior to admin</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="text-center py-8">
-                <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground mb-2">No messages yet</p>
-                <p className="text-sm text-muted-foreground">Patient messages will appear here</p>
+              <div>
+                <label className="block text-sm font-medium mb-2">User Type</label>
+                <select 
+                  className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                  value={userReportForm.userType}
+                  onChange={(e) => setUserReportForm(prev => ({ ...prev, userType: e.target.value }))}
+                >
+                  <option value="patient">Patient</option>
+                  <option value="pharmacy">Pharmacy</option>
+                  <option value="other">Other</option>
+                </select>
               </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">User ID or Name</label>
+                <Input 
+                  placeholder="Enter user ID or name" 
+                  value={userReportForm.userIdOrName}
+                  onChange={(e) => setUserReportForm(prev => ({ ...prev, userIdOrName: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Issue Type</label>
+                <select 
+                  className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                  value={userReportForm.issueType}
+                  onChange={(e) => setUserReportForm(prev => ({ ...prev, issueType: e.target.value }))}
+                >
+                  <option value="inappropriate">Inappropriate Behavior</option>
+                  <option value="spam">Spam/Unwanted Messages</option>
+                  <option value="fake">Fake Profile</option>
+                  <option value="harassment">Harassment</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Description</label>
+                <Textarea 
+                  placeholder="Describe the issue in detail..." 
+                  rows={4}
+                  value={userReportForm.description}
+                  onChange={(e) => setUserReportForm(prev => ({ ...prev, description: e.target.value }))}
+                />
+              </div>
+              <Button 
+                variant="destructive" 
+                className="w-full"
+                disabled={isSubmittingUserReport}
+                onClick={async () => {
+                  if (!userReportForm.userIdOrName.trim() || !userReportForm.description.trim()) {
+                    toast({
+                      title: 'Missing Information',
+                      description: 'Please fill in user ID/name and description',
+                      variant: 'destructive'
+                    });
+                    return;
+                  }
+                  
+                  try {
+                    const reportData = {
+                      reporterId: user?.id,
+                      reporterName: user?.name,
+                      reporterType: 'DOCTOR',
+                      reportType: 'user-report',
+                      reportedUserType: userReportForm.userType,
+                      reportedUserIdOrName: userReportForm.userIdOrName,
+                      issueType: userReportForm.issueType,
+                      description: userReportForm.description,
+                      timestamp: new Date().toISOString()
+                    };
+                    
+                    setIsSubmittingUserReport(true);
+                    console.log('Doctor submitting report:', reportData);
+                    
+                    // Submit to backend API
+                    const response = await fetch('http://localhost:8080/api/reports/submit', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify(reportData)
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                      // Also send via socket for real-time notification
+                      if (socket && socket.connected) {
+                        socket.emit('user_report', { ...reportData, reportId: result.reportId });
+                      }
+                      
+                      toast({
+                        title: '✅ Report Submitted',
+                        description: `Report #${result.reportId} submitted successfully`,
+                      });
+                      
+                      setUserReportForm({ userType: 'patient', userIdOrName: '', issueType: 'inappropriate', description: '' });
+                      loadDoctorReports();
+                    } else {
+                      toast({
+                        title: 'Submission Failed',
+                        description: result.message || 'Failed to submit report',
+                        variant: 'destructive'
+                      });
+                    }
+                  } catch (error) {
+                    console.error('Doctor report submission error:', error);
+                    toast({
+                      title: 'Error',
+                      description: 'Failed to submit report. Please try again.',
+                      variant: 'destructive'
+                    });
+                  } finally {
+                    setIsSubmittingUserReport(false);
+                  }
+                }}
+              >
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                {isSubmittingUserReport ? 'Submitting...' : 'Submit Report to Admin'}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
 
+        <TabsContent value="my-reports" className="space-y-4">
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>My Reports ({doctorReports.length})</span>
+                <Button 
+                  onClick={loadDoctorReports}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Activity className="h-4 w-4 mr-1" />
+                  Refresh
+                </Button>
+              </CardTitle>
+              <CardDescription>Track your submitted reports and their status</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {doctorReports.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="bg-muted/30 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                    <FileText className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <p className="text-muted-foreground mb-2">No reports submitted yet</p>
+                  <p className="text-sm text-muted-foreground">Your reports will appear here once submitted</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {doctorReports.map((report) => (
+                    <div key={report.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                            <AlertTriangle className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <span className="font-medium text-lg">Report #{report.id}</span>
+                            <p className="text-sm text-muted-foreground capitalize">
+                              {report.reportType?.replace('-', ' ')}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <Badge 
+                            variant={
+                              report.status === 'PENDING' ? 'secondary' : 
+                              report.status === 'REVIEWED' ? 'default' : 
+                              report.status === 'RESOLVED' ? 'outline' : 'secondary'
+                            }
+                            className="mb-1"
+                          >
+                            {report.status}
+                          </Badge>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(report.timestamp).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-muted/30 p-3 rounded-lg mb-3">
+                        <p className="text-sm font-medium mb-1">Reported User:</p>
+                        <p className="text-sm text-muted-foreground">{report.reportedUserIdOrName}</p>
+                      </div>
+                      
+                      <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                        <p className="text-sm font-medium mb-1 text-blue-800">Description:</p>
+                        <p className="text-sm text-blue-700">{report.description}</p>
+                      </div>
+                      
+                      <div className="flex justify-between items-center mt-3 pt-3 border-t">
+                        <div className="flex items-center space-x-2">
+                          <div className={`w-2 h-2 rounded-full ${
+                            report.status === 'PENDING' ? 'bg-yellow-500 animate-pulse' :
+                            report.status === 'REVIEWED' ? 'bg-blue-500' :
+                            report.status === 'RESOLVED' ? 'bg-green-500' : 'bg-gray-400'
+                          }`}></div>
+                          <span className="text-xs text-muted-foreground">
+                            {report.status === 'PENDING' ? 'Waiting for admin review' :
+                             report.status === 'REVIEWED' ? 'Under investigation' :
+                             report.status === 'RESOLVED' ? 'Issue resolved' : 'Status unknown'}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          Submitted {new Date(report.timestamp).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
       </Tabs>
 

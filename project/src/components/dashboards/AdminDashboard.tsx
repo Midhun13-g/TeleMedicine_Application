@@ -23,10 +23,12 @@ import {
   Clock,
   Stethoscope,
   Building2,
-  Heart
+  Heart,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import io from 'socket.io-client';
 
 interface User {
   id: number;
@@ -61,14 +63,67 @@ const AdminDashboard = () => {
   });
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [reports, setReports] = useState<any[]>([]);
+  const [socket, setSocket] = useState<any>(null);
+  const [loadingReports, setLoadingReports] = useState(false);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  
+  const loadAllReports = async () => {
+    setLoadingReports(true);
+    try {
+      const response = await fetch('http://localhost:8080/api/reports/all');
+      if (response.ok) {
+        const allReports = await response.json();
+        setReports(allReports);
+        console.log('Loaded reports from API:', allReports);
+      }
+    } catch (error) {
+      console.error('Failed to load reports:', error);
+    } finally {
+      setLoadingReports(false);
+    }
+  };
 
   useEffect(() => {
     loadUsers();
-    // Auto-refresh dashboard every 30 seconds
+    loadAllReports();
+    
+    // Initialize socket for receiving real-time reports
+    const socketConnection = io('http://localhost:5002', {
+      transports: ['websocket', 'polling']
+    });
+    setSocket(socketConnection);
+    
+    socketConnection.on('connect', () => {
+      console.log('✅ Admin connected to receive reports');
+      socketConnection.emit('admin_subscribe', { adminId: 'admin' });
+    });
+    
+    // Listen for report events and refresh from API
+    socketConnection.on('new_report_submitted', (data) => {
+      loadAllReports();
+      toast({ title: 'New Report', description: `Report #${data.reportId} submitted` });
+    });
+    
+    socketConnection.on('report_status_updated', (data) => {
+      loadAllReports();
+    });
+    
+    socketConnection.on('user_report', (data) => {
+      loadAllReports();
+    });
+    
+    // Auto-refresh every 3 seconds for reports
     const interval = setInterval(() => {
-      loadUsers();
-    }, 30000);
-    return () => clearInterval(interval);
+      loadAllReports();
+    }, 3000);
+    
+    return () => {
+      clearInterval(interval);
+      if (socketConnection) {
+        socketConnection.disconnect();
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -351,10 +406,11 @@ const AdminDashboard = () => {
         </Card>
       </div>
 
-      <Tabs defaultValue="dashboard" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="users">User Management</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="settings">System Settings</TabsTrigger>
         </TabsList>
 
@@ -576,11 +632,30 @@ const AdminDashboard = () => {
                     Quick Actions
                   </h4>
                   <div className="space-y-2">
-                    <Button variant="outline" size="sm" className="w-full justify-start hover:scale-105 transition-transform">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full justify-start hover:scale-105 transition-transform"
+                      onClick={() => setActiveTab('users')}
+                    >
                       <Users className="h-4 w-4 mr-2" />
                       View All Users
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start hover:scale-105 transition-transform">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full justify-start hover:scale-105 transition-transform"
+                      onClick={() => setActiveTab('reports')}
+                    >
+                      <AlertTriangle className="h-4 w-4 mr-2" />
+                      View Reports
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full justify-start hover:scale-105 transition-transform"
+                      onClick={() => setActiveTab('settings')}
+                    >
                       <Settings className="h-4 w-4 mr-2" />
                       System Settings
                     </Button>
@@ -681,6 +756,183 @@ const AdminDashboard = () => {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="reports" className="space-y-4">
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <AlertTriangle className="h-5 w-5 text-warning" />
+                <span>User Reports & Feedback ({reports.length})</span>
+              </CardTitle>
+              <CardDescription>
+                All reports from patients and doctors - fake users, inappropriate behavior, and feedback
+                <br />
+                <span className="text-xs text-muted-foreground">
+                  Socket Status: {socket?.connected ? '✅ Connected' : '❌ Disconnected'}
+                </span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-4 gap-4 mb-6">
+                <div className="text-center p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">{reports.length}</div>
+                  <div className="text-sm text-green-600">Total Reports</div>
+                </div>
+                <div className="text-center p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="text-2xl font-bold text-red-600">{reports.filter(r => r.reportType?.includes('fake')).length}</div>
+                  <div className="text-sm text-red-600">Fake User Reports</div>
+                </div>
+                <div className="text-center p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                  <div className="text-2xl font-bold text-orange-600">{reports.filter(r => r.issueType === 'inappropriate-behavior' || r.issueType === 'harassment').length}</div>
+                  <div className="text-sm text-orange-600">Inappropriate Behavior</div>
+                </div>
+                <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600">{reports.filter(r => r.reportType === 'doctor-feedback').length}</div>
+                  <div className="text-sm text-blue-600">User Feedback</div>
+                </div>
+              </div>
+              
+              <div className="flex space-x-2 mb-4">
+                <Button 
+                  onClick={() => {
+                    loadAllReports();
+                    toast({
+                      title: 'Reports Refreshed',
+                      description: 'Loaded latest reports from database',
+                    });
+                  }}
+                  variant="outline"
+                  size="sm"
+                  disabled={loadingReports}
+                >
+                  {loadingReports ? 'Loading...' : '🔄 Refresh Reports'}
+                </Button>
+                <Button 
+                  onClick={() => {
+                    // Add test report
+                    const testReport = {
+                      reporterId: 'test-123',
+                      reporterName: 'Test User',
+                      reporterType: 'PATIENT',
+                      reportType: 'fake-doctor',
+                      reportedUserIdOrName: 'Dr. Fake',
+                      issueType: 'fake-profile',
+                      description: 'This is a test report',
+                      timestamp: new Date().toISOString()
+                    };
+                    setReports(prev => [testReport, ...prev]);
+                    toast({
+                      title: '🧪 Test Report Added',
+                      description: 'Added a test report to verify display',
+                    });
+                  }}
+                  variant="secondary"
+                  size="sm"
+                >
+                  🧪 Add Test Report
+                </Button>
+                <Button 
+                  onClick={() => {
+                    if (socket && socket.connected) {
+                      socket.emit('test_admin_connection', { message: 'Admin testing connection' });
+                      console.log('📡 Sent test message to server');
+                      toast({
+                        title: '📡 Test Sent',
+                        description: 'Sent test message to server',
+                      });
+                    } else {
+                      toast({
+                        title: 'Not Connected',
+                        description: 'Socket is not connected',
+                        variant: 'destructive'
+                      });
+                    }
+                  }}
+                  variant="ghost"
+                  size="sm"
+                >
+                  📡 Test Connection
+                </Button>
+              </div>
+              
+              {reports.length === 0 ? (
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-2">No reports available</p>
+                  <p className="text-sm text-muted-foreground">Reports from patients about fake doctors/pharmacies and doctor reports about unwanted users will appear here</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <h4 className="font-medium">Recent Reports ({reports.length})</h4>
+                  {reports.map((report, index) => (
+                    <div key={index} className="border border-border rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <AlertTriangle className="h-4 w-4 text-warning" />
+                          <span className="font-medium">{report.reportType?.replace('-', ' ').toUpperCase()}</span>
+                          <Badge variant={report.reporterType === 'PATIENT' ? 'default' : 'secondary'}>
+                            From {report.reporterType}
+                          </Badge>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(report.timestamp).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        <p><strong>Reporter:</strong> {report.reporterName} (ID: {report.reporterId})</p>
+                        <p><strong>Reported User:</strong> {report.reportedUserIdOrName}</p>
+                        <p><strong>Issue:</strong> {report.issueType?.replace('-', ' ')}</p>
+                        {report.rating && <p><strong>Rating:</strong> {report.rating}/5 stars</p>}
+                        <p><strong>Description:</strong> {report.description}</p>
+                      </div>
+                      <div className="flex space-x-2 mt-3">
+                        <Button 
+                          size="sm" 
+                          variant={report.status === 'REVIEWED' ? 'default' : 'outline'}
+                          disabled={report.status === 'REVIEWED' || report.status === 'RESOLVED'}
+                          onClick={async () => {
+                            fetch(`http://localhost:8080/api/reports/${report.id}/status`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ status: 'REVIEWED' })
+                            }).then(response => {
+                              if (response.ok) {
+                                loadAllReports();
+                                toast({ title: 'Status Updated', description: 'Report reviewed' });
+                              }
+                            });
+                          }}
+                        >
+                          {report.status === 'REVIEWED' ? 'Reviewed ✓' : 'Mark Reviewed'}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant={report.status === 'RESOLVED' ? 'default' : 'success'}
+                          disabled={report.status === 'RESOLVED'}
+                          onClick={async () => {
+                            fetch(`http://localhost:8080/api/reports/${report.id}/status`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ status: 'RESOLVED' })
+                            }).then(response => {
+                              if (response.ok) {
+                                loadAllReports();
+                                toast({ title: 'Report Resolved', description: 'Issue resolved' });
+                              }
+                            });
+                          }}
+                        >
+                          {report.status === 'RESOLVED' ? 'Resolved ✓' : 'Resolve'}
+                        </Button>
+
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">

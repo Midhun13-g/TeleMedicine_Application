@@ -105,6 +105,23 @@ app.post('/api/medicine/taken', (req, res) => {
   res.json({ success: true, message: 'Doctor notified' });
 });
 
+// Report status update endpoint
+app.post('/api/emit/report-status-update', (req, res) => {
+  const { reportId, reporterId, status } = req.body;
+  const eventData = { reportId, reporterId, status };
+  
+  // Broadcast to ALL clients immediately
+  io.emit('report_status_updated', eventData);
+  io.emit('admin_reports_refresh', eventData);
+  io.emit('reports_global_update', eventData);
+  
+  if (status === 'PENDING') {
+    io.emit('new_report_submitted', eventData);
+  }
+  
+  res.json({ success: true });
+});
+
 app.post('/api/calls/consultation/request', (req, res) => {
   const { patientId, doctorId } = req.body;
   const consultationId = `consultation_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -234,7 +251,7 @@ io.on('connection', (socket) => {
   socket.on('doctor_online', ({ doctorId, doctorInfo }) => {
     doctors.set(doctorId, { ...doctorInfo, online: true, socketId: socket.id });
     io.emit('doctor_status_changed', { doctorId, status: 'online', doctorInfo });
-    console.log(`🟢 Doctor ${doctorId} online`);
+    console.log(`🟢 Doctor ${doctorId} online with socket: ${socket.id}`);
   });
 
   socket.on('doctor_offline', ({ doctorId }) => {
@@ -265,6 +282,17 @@ io.on('connection', (socket) => {
       .map(([doctorId, info]) => ({ doctorId, ...info }));
     socket.emit('doctors_status', onlineDoctors);
     console.log(`👤 Patient ${patientId} subscribed with socket: ${socket.id}`);
+  });
+  
+  socket.on('doctor_subscribe', ({ doctorId }) => {
+    // Track doctor socket connection for reports
+    if (doctors.has(doctorId)) {
+      const currentDoctor = doctors.get(doctorId);
+      doctors.set(doctorId, { ...currentDoctor, socketId: socket.id, online: true });
+    } else {
+      doctors.set(doctorId, { socketId: socket.id, online: true });
+    }
+    console.log(`🩺 Doctor ${doctorId} subscribed with socket: ${socket.id}`);
   });
 
   // Consultation handling
@@ -414,6 +442,18 @@ io.on('connection', (socket) => {
     // Also broadcast to all as fallback
     io.emit('medicine_taken', data);
     console.log(`  - 📡 Broadcasted medicine_taken to all clients`);
+  });
+  
+  // Report management
+  socket.on('user_report', (reportData) => {
+    io.emit('user_report', reportData);
+    io.emit('new_report_submitted', reportData);
+    io.emit('admin_reports_refresh', reportData);
+    io.emit('reports_global_update', reportData);
+  });
+  
+  socket.on('admin_subscribe', ({ adminId }) => {
+    socket.adminId = adminId;
   });
 
   socket.on('disconnect', () => {
