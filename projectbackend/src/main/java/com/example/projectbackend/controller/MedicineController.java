@@ -101,19 +101,53 @@ public class MedicineController {
                 return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Valid stock quantity is required"));
             }
             
-            // Set defaults
+            // Set defaults for optional fields
             if (medicine.getAvailable() == null) {
                 medicine.setAvailable(medicine.getStock() > 0);
             }
             if (medicine.getMinStockLevel() == null) {
                 medicine.setMinStockLevel(10);
             }
+            if (medicine.getManufacturer() == null) {
+                medicine.setManufacturer("");
+            }
+            if (medicine.getCategory() == null) {
+                medicine.setCategory("");
+            }
+            if (medicine.getDescription() == null) {
+                medicine.setDescription("");
+            }
+            if (medicine.getDosage() == null) {
+                medicine.setDosage("");
+            }
+            if (medicine.getSideEffects() == null) {
+                medicine.setSideEffects("");
+            }
             
-            // Verify pharmacy exists
+            // Verify pharmacy exists - try both Pharmacy entity and User entity
+            boolean pharmacyExists = false;
             try {
                 pharmacyService.findById(medicine.getPharmacyId());
+                pharmacyExists = true;
+                System.out.println("✅ Pharmacy found in Pharmacy table");
             } catch (Exception e) {
-                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Pharmacy not found with ID: " + medicine.getPharmacyId()));
+                // Try to find pharmacy user
+                try {
+                    User pharmacyUser = userService.findById(medicine.getPharmacyId());
+                    if (pharmacyUser != null && pharmacyUser.getRole() == User.Role.PHARMACY) {
+                        pharmacyExists = true;
+                        System.out.println("✅ Pharmacy user found in User table");
+                    }
+                } catch (Exception userError) {
+                    System.out.println("❌ Pharmacy not found in either table");
+                }
+            }
+            
+            if (!pharmacyExists) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false, 
+                    "message", "Pharmacy not found with ID: " + medicine.getPharmacyId() + ". Please ensure the pharmacy is registered."
+                ));
             }
             
             Medicine saved = medicineService.save(medicine);

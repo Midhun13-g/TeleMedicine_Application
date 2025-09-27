@@ -101,44 +101,78 @@ const PharmacyDashboard = () => {
   };
 
   const handleAddMedicine = async () => {
-    if (!newMedicine.name || !newMedicine.stock || !newMedicine.price) {
+    // Validate required fields
+    if (!newMedicine.name?.trim()) {
       toast({
-        title: "Error",
-        description: "Please fill in all required fields.",
+        title: "Validation Error",
+        description: "Medicine name is required.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!newMedicine.stock || parseInt(newMedicine.stock) < 0) {
+      toast({
+        title: "Validation Error",
+        description: "Valid stock quantity is required.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!newMedicine.price || parseFloat(newMedicine.price) <= 0) {
+      toast({
+        title: "Validation Error",
+        description: "Valid price is required.",
         variant: "destructive"
       });
       return;
     }
 
     const medicineData = {
-      name: newMedicine.name,
-      stock: parseInt(newMedicine.stock),
-      price: parseFloat(newMedicine.price),
-      manufacturer: newMedicine.manufacturer || '',
-      category: newMedicine.category || '',
+      name: newMedicine.name.trim(),
+      stock: parseInt(newMedicine.stock) || 0,
+      price: parseFloat(newMedicine.price) || 0,
+      manufacturer: newMedicine.manufacturer?.trim() || '',
+      category: newMedicine.category?.trim() || '',
+      description: newMedicine.description?.trim() || '',
+      dosage: newMedicine.dosage?.trim() || '',
+      sideEffects: '',
+      expiryDate: newMedicine.expiryDate || '',
+      batchNumber: '',
       pharmacyId: pharmacyId,
       available: parseInt(newMedicine.stock) > 0,
-      minStockLevel: 10
+      minStockLevel: parseInt(newMedicine.minStockLevel) || 10
     };
 
-    console.log('Adding medicine:', medicineData);
+    console.log('💊 Adding medicine:', medicineData);
 
     try {
       const response = await fetch('http://localhost:8080/api/medicines/add', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify(medicineData)
       });
 
-      console.log('Response status:', response.status);
+      console.log('📥 Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const result = await response.json();
-      console.log('Response data:', result);
+      console.log('📥 Response data:', result);
       
       if (result.success) {
         toast({
-          title: "Medicine Added",
-          description: `${newMedicine.name} has been added to your inventory.`,
+          title: "✅ Medicine Added Successfully",
+          description: `${newMedicine.name} has been added to your inventory with ID: ${result.medicineId}`,
         });
+        
+        // Clear form
         setNewMedicine({
           name: '',
           stock: '',
@@ -150,19 +184,27 @@ const PharmacyDashboard = () => {
           expiryDate: '',
           minStockLevel: '10'
         });
+        
+        // Reload medicines
         loadMedicines();
       } else {
         toast({
-          title: "Error",
-          description: result.message || "Failed to add medicine",
+          title: "❌ Failed to Add Medicine",
+          description: result.message || "Unknown error occurred",
           variant: "destructive"
         });
       }
     } catch (error) {
-      console.error('Add medicine error:', error);
+      console.error('❌ Add medicine error:', error);
+      
+      let errorMessage = error.message;
+      if (error.message.includes('Failed to fetch')) {
+        errorMessage = 'Cannot connect to backend server. Please ensure the backend is running on http://localhost:8080';
+      }
+      
       toast({
-        title: "Error",
-        description: `Network error: ${error.message}`,
+        title: "❌ Network Error",
+        description: errorMessage,
         variant: "destructive"
       });
     }

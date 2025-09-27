@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fixed Medicine Add Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        button { background: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin: 5px; }
+        button:hover { background: #0056b3; }
+        button.success { background: #28a745; }
+        button.warning { background: #ffc107; color: #212529; }
+        .result { margin-top: 20px; padding: 15px; border-radius: 4px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        .debug { background: #f8f9fa; border: 1px solid #dee2e6; color: #495057; font-family: monospace; white-space: pre-wrap; font-size: 12px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .status { padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+        .status.online { background: #d4edda; color: #155724; }
+        .status.offline { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Fixed Medicine Add Test</h1>
+        <div id="connectionStatus" class="status offline">Backend: Checking...</div>
+        
+        <div class="grid">
+            <div>
+                <h3>📋 Test Medicine Form</h3>
+                <form id="medicineForm">
+                    <div class="form-group">
+                        <label>Pharmacy ID:</label>
+                        <input type="number" id="pharmacyId" value="1" required>
+                        <small>Use 1, 2, or 3 for existing pharmacies</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Medicine Name:</label>
+                        <input type="text" id="medicineName" value="Test Medicine" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Stock Quantity:</label>
+                        <input type="number" id="stock" value="50" required min="0">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Price (₹):</label>
+                        <input type="number" step="0.01" id="price" value="25.50" required min="0.01">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Category:</label>
+                        <select id="category">
+                            <option value="">Select category...</option>
+                            <option value="Pain Relief">Pain Relief</option>
+                            <option value="Antibiotics">Antibiotics</option>
+                            <option value="Vitamins">Vitamins</option>
+                            <option value="Cold & Flu">Cold & Flu</option>
+                            <option value="Diabetes">Diabetes</option>
+                            <option value="Heart Disease">Heart Disease</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Manufacturer:</label>
+                        <select id="manufacturer">
+                            <option value="">Select manufacturer...</option>
+                            <option value="Sun Pharma">Sun Pharma</option>
+                            <option value="Cipla">Cipla</option>
+                            <option value="GSK">GSK</option>
+                            <option value="Pfizer">Pfizer</option>
+                            <option value="Dr. Reddy's">Dr. Reddy's</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Dosage:</label>
+                        <input type="text" id="dosage" value="500mg" placeholder="e.g., 500mg, 10ml">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Description:</label>
+                        <textarea id="description" rows="2" placeholder="Brief description..."></textarea>
+                    </div>
+                    
+                    <button type="submit">➕ Add Medicine</button>
+                </form>
+            </div>
+            
+            <div>
+                <h3>🔧 Quick Tests</h3>
+                <button onclick="testConnection()" class="success">🔗 Test Connection</button>
+                <button onclick="testPharmacyExists()" class="warning">🏥 Check Pharmacy</button>
+                <button onclick="loadMedicines()">📋 Load Medicines</button>
+                <button onclick="testAddMinimal()">⚡ Add Minimal</button>
+                <button onclick="clearResults()">🧹 Clear Results</button>
+                
+                <h4>📊 Quick Add Presets</h4>
+                <button onclick="setPreset('paracetamol')">Paracetamol</button>
+                <button onclick="setPreset('azithromycin')">Azithromycin</button>
+                <button onclick="setPreset('cetirizine')">Cetirizine</button>
+            </div>
+        </div>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api';
+        
+        // Check connection on load
+        window.addEventListener('load', () => {
+            testConnection();
+        });
+        
+        document.getElementById('medicineForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await addMedicine();
+        });
+        
+        async function testConnection() {
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.textContent = 'Backend: Checking...';
+            statusEl.className = 'status offline';
+            
+            try {
+                const response = await fetch(`${API_BASE}/medicines/popular`);
+                if (response.ok) {
+                    statusEl.textContent = 'Backend: Online ✅';
+                    statusEl.className = 'status online';
+                    showResult('✅ Backend connection successful', 'success');
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                statusEl.textContent = 'Backend: Offline ❌';
+                statusEl.className = 'status offline';
+                showResult(`❌ Backend connection failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function addMedicine() {
+            showResult('🔄 Adding medicine...', 'info');
+            
+            const medicineData = {
+                name: document.getElementById('medicineName').value.trim(),
+                stock: parseInt(document.getElementById('stock').value) || 0,
+                price: parseFloat(document.getElementById('price').value) || 0,
+                category: document.getElementById('category').value || '',
+                manufacturer: document.getElementById('manufacturer').value || '',
+                pharmacyId: parseInt(document.getElementById('pharmacyId').value) || 1,
+                available: true,
+                minStockLevel: 10,
+                dosage: document.getElementById('dosage').value || '',
+                description: document.getElementById('description').value || '',
+                sideEffects: '',
+                expiryDate: '',
+                batchNumber: ''
+            };
+            
+            // Validate required fields
+            if (!medicineData.name) {
+                showResult('❌ Medicine name is required', 'error');
+                return;
+            }
+            if (medicineData.price <= 0) {
+                showResult('❌ Valid price is required', 'error');
+                return;
+            }
+            if (medicineData.stock < 0) {
+                showResult('❌ Stock cannot be negative', 'error');
+                return;
+            }
+            
+            console.log('📤 Sending medicine data:', medicineData);
+            
+            try {
+                const response = await fetch(`${API_BASE}/medicines/add`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(medicineData)
+                });
+                
+                console.log('📥 Response status:', response.status);
+                const result = await response.json();
+                console.log('📥 Response data:', result);
+                
+                if (result.success) {
+                    showResult(`✅ Medicine "${medicineData.name}" added successfully!\\nID: ${result.medicineId}\\nStock: ${result.medicine?.stock}\\nPrice: ₹${result.medicine?.price}`, 'success');
+                    
+                    // Clear form
+                    document.getElementById('medicineForm').reset();
+                    document.getElementById('pharmacyId').value = '1';
+                    document.getElementById('stock').value = '50';
+                    document.getElementById('price').value = '25.50';
+                } else {
+                    showResult(`❌ Failed to add medicine\\nError: ${result.message}`, 'error');
+                }
+                
+                // Show debug info
+                showDebug(result);
+                
+            } catch (error) {
+                console.error('❌ Network error:', error);
+                showResult(`❌ Network Error: ${error.message}\\nMake sure backend is running on http://localhost:8080`, 'error');
+            }
+        }
+        
+        async function testPharmacyExists() {
+            const pharmacyId = document.getElementById('pharmacyId').value;
+            showResult(`🔍 Checking pharmacy ID ${pharmacyId}...`, 'info');
+            
+            try {
+                // Try pharmacy endpoint first
+                let response = await fetch(`${API_BASE}/pharmacies/${pharmacyId}`);
+                if (response.ok) {
+                    const pharmacy = await response.json();
+                    showResult(`✅ Pharmacy found!\\nID: ${pharmacy.id}\\nName: ${pharmacy.name}\\nAddress: ${pharmacy.address}`, 'success');
+                    return;
+                }
+                
+                // Try user endpoint as fallback
+                response = await fetch(`${API_BASE}/auth/users/${pharmacyId}`);
+                if (response.ok) {
+                    const user = await response.json();
+                    if (user.role === 'PHARMACY') {
+                        showResult(`✅ Pharmacy user found!\\nID: ${user.id}\\nName: ${user.name}\\nRole: ${user.role}`, 'success');
+                    } else {
+                        showResult(`⚠️ User found but not a pharmacy\\nRole: ${user.role}`, 'error');
+                    }
+                } else {
+                    showResult(`❌ Pharmacy not found with ID: ${pharmacyId}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ Error checking pharmacy: ${error.message}`, 'error');
+            }
+        }
+        
+        async function loadMedicines() {
+            const pharmacyId = document.getElementById('pharmacyId').value;
+            showResult(`📋 Loading medicines for pharmacy ${pharmacyId}...`, 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/medicines/pharmacy/${pharmacyId}`);
+                const medicines = await response.json();
+                
+                if (response.ok) {
+                    showResult(`✅ Found ${medicines.length} medicines for pharmacy ${pharmacyId}`, 'success');
+                    if (medicines.length > 0) {
+                        const medicineList = medicines.map(m => `• ${m.name} (Stock: ${m.stock}, Price: ₹${m.price})`).join('\\n');
+                        showDebug(`Medicines:\\n${medicineList}`);
+                    }
+                } else {
+                    showResult(`❌ Failed to load medicines`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ Error loading medicines: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testAddMinimal() {
+            const minimal = {
+                name: "Minimal Test Medicine",
+                stock: 10,
+                price: 15.0,
+                pharmacyId: parseInt(document.getElementById('pharmacyId').value) || 1
+            };
+            
+            showResult('⚡ Adding minimal medicine...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/medicines/add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(minimal)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResult(`✅ Minimal medicine added successfully!\\nID: ${result.medicineId}`, 'success');
+                } else {
+                    showResult(`❌ Failed: ${result.message}`, 'error');
+                }
+                
+                showDebug(result);
+            } catch (error) {
+                showResult(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        function setPreset(type) {
+            const presets = {
+                paracetamol: {
+                    name: 'Paracetamol 500mg',
+                    category: 'Pain Relief',
+                    manufacturer: 'GSK',
+                    stock: '100',
+                    price: '25.00',
+                    dosage: '500mg'
+                },
+                azithromycin: {
+                    name: 'Azithromycin 500mg',
+                    category: 'Antibiotics',
+                    manufacturer: 'Pfizer',
+                    stock: '50',
+                    price: '120.00',
+                    dosage: '500mg'
+                },
+                cetirizine: {
+                    name: 'Cetirizine 10mg',
+                    category: 'Allergy',
+                    manufacturer: 'Sun Pharma',
+                    stock: '200',
+                    price: '15.00',
+                    dosage: '10mg'
+                }
+            };
+            
+            const preset = presets[type];
+            if (preset) {
+                document.getElementById('medicineName').value = preset.name;
+                document.getElementById('category').value = preset.category;
+                document.getElementById('manufacturer').value = preset.manufacturer;
+                document.getElementById('stock').value = preset.stock;
+                document.getElementById('price').value = preset.price;
+                document.getElementById('dosage').value = preset.dosage;
+                showResult(`📋 Preset loaded: ${preset.name}`, 'info');
+            }
+        }
+        
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            const timestamp = new Date().toLocaleTimeString();
+            resultDiv.innerHTML = `<div class="${type}">[${timestamp}] ${message}</div>` + resultDiv.innerHTML;
+        }
+        
+        function showDebug(data) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML += `<div class="debug">Debug Info:\\n${JSON.stringify(data, null, 2)}</div>`;
+        }
+        
+        function clearResults() {
+            document.getElementById('result').innerHTML = '';
+        }
+    </script>
+</body>
+</html>

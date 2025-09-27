@@ -15,24 +15,45 @@ public class Medicine {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    @Column(nullable = false)
+    @Column(nullable = false, length = 255)
     private String name;
     
-    private String manufacturer;
-    private String category;
-    private String description;
+    @Column(length = 255)
+    private String manufacturer = "";
+    
+    @Column(length = 100)
+    private String category = "";
+    
+    @Column(length = 1000)
+    private String description = "";
+    
+    @Column(nullable = false)
     private Double price;
+    
+    @Column(nullable = false)
     private Boolean available = true;
-    private String dosage;
-    private String sideEffects;
+    
+    @Column(length = 100)
+    private String dosage = "";
+    
+    @Column(length = 500)
+    private String sideEffects = "";
     
     // Stock management fields
+    @Column(nullable = false)
     private Integer stock = 0;
+    
+    @Column(nullable = false)
     private Integer minStockLevel = 10;
+    
+    @Column(length = 20)
     private String expiryDate;
+    
+    @Column(length = 50)
     private String batchNumber;
     
     // Pharmacy association
+    @Column(nullable = false)
     private Long pharmacyId;
     
     public boolean isLowStock() {
