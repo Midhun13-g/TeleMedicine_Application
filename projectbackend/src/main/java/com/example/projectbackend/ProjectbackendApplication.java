@@ -3,9 +3,11 @@ package com.example.projectbackend;
 import com.example.projectbackend.model.User;
 import com.example.projectbackend.model.Pharmacy;
 import com.example.projectbackend.model.Medicine;
+import com.example.projectbackend.model.HealthRecord;
 import com.example.projectbackend.service.UserService;
 import com.example.projectbackend.service.PharmacyService;
 import com.example.projectbackend.service.MedicineService;
+import com.example.projectbackend.repository.HealthRecordRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -19,7 +21,7 @@ public class ProjectbackendApplication {
 	}
 
 	@Bean
-	CommandLineRunner initDatabase(UserService userService, PharmacyService pharmacyService, MedicineService medicineService) {
+	CommandLineRunner initDatabase(UserService userService, PharmacyService pharmacyService, MedicineService medicineService, HealthRecordRepository healthRecordRepository) {
 		return args -> {
 			// Check if data already exists
 			if (userService.getAllUsers().isEmpty()) {
@@ -129,6 +131,9 @@ public class ProjectbackendApplication {
 				medicineService.save(cetirizine);
 				System.out.println("Created medicine: Cetirizine 10mg for pharmacy ID: " + wellnessPharmacy.getId());
 
+				// Create comprehensive health records
+				createHealthRecords(healthRecordRepository);
+
 				System.out.println("Initial data creation completed.");
 			} else {
 				System.out.println("Database already contains data. Skipping initialization.");
@@ -154,5 +159,59 @@ public class ProjectbackendApplication {
 					.println("ID: " + medicine.getId() + ", Name: " + medicine.getName() + ", Pharmacy ID: " + medicine.getPharmacyId() + ", Stock: " + medicine.getStock()));
 			System.out.println("==============================\n");
 		};
+	}
+
+	private void createHealthRecords(HealthRecordRepository healthRecordRepository) {
+		// Patient 1 (Ramesh Kumar) - Comprehensive Health Profile
+		// Vital Signs
+		healthRecordRepository.save(new HealthRecord(null, 1L, "VITAL_SIGNS", "Blood Pressure", "120/80", "mmHg", "NORMAL", java.time.LocalDateTime.now().minusDays(1), "Dr. Rachit Sharma", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 1L, "VITAL_SIGNS", "Heart Rate", "72", "bpm", "NORMAL", java.time.LocalDateTime.now().minusDays(1), "Dr. Rachit Sharma", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 1L, "VITAL_SIGNS", "Body Temperature", "98.6", "°F", "NORMAL", java.time.LocalDateTime.now().minusDays(1), "Dr. Rachit Sharma", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 1L, "VITAL_SIGNS", "Weight", "70", "kg", "NORMAL", java.time.LocalDateTime.now().minusDays(2), "Dr. Rachit Sharma", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 1L, "VITAL_SIGNS", "Height", "175", "cm", "NORMAL", java.time.LocalDateTime.now().minusDays(30), "Dr. Rachit Sharma", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 1L, "VITAL_SIGNS", "BMI", "22.9", "kg/m²", "NORMAL", java.time.LocalDateTime.now().minusDays(2), "Dr. Rachit Sharma", java.time.LocalDateTime.now()));
+		
+		// Lab Results
+		healthRecordRepository.save(new HealthRecord(null, 1L, "LAB_RESULTS", "Blood Sugar (Fasting)", "95", "mg/dL", "NORMAL", java.time.LocalDateTime.now().minusDays(7), "Dr. Rachit Sharma", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 1L, "LAB_RESULTS", "Total Cholesterol", "180", "mg/dL", "NORMAL", java.time.LocalDateTime.now().minusDays(14), "Dr. Rachit Sharma", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 1L, "LAB_RESULTS", "HDL Cholesterol", "45", "mg/dL", "NORMAL", java.time.LocalDateTime.now().minusDays(14), "Dr. Rachit Sharma", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 1L, "LAB_RESULTS", "LDL Cholesterol", "110", "mg/dL", "NORMAL", java.time.LocalDateTime.now().minusDays(14), "Dr. Rachit Sharma", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 1L, "LAB_RESULTS", "Hemoglobin", "14.2", "g/dL", "NORMAL", java.time.LocalDateTime.now().minusDays(21), "Dr. Rachit Sharma", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 1L, "LAB_RESULTS", "White Blood Cells", "7500", "/μL", "NORMAL", java.time.LocalDateTime.now().minusDays(21), "Dr. Rachit Sharma", java.time.LocalDateTime.now()));
+		
+		// Medications
+		healthRecordRepository.save(new HealthRecord(null, 1L, "MEDICATION", "Vitamin D3", "1000", "IU/day", "NORMAL", java.time.LocalDateTime.now().minusDays(30), "Dr. Rachit Sharma", java.time.LocalDateTime.now()));
+		
+		// Patient 2 (Sunita Devi) - Health Issues Profile
+		// Vital Signs
+		healthRecordRepository.save(new HealthRecord(null, 2L, "VITAL_SIGNS", "Blood Pressure", "140/90", "mmHg", "HIGH", java.time.LocalDateTime.now().minusDays(1), "Dr. Priya Singh", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 2L, "VITAL_SIGNS", "Heart Rate", "85", "bpm", "HIGH", java.time.LocalDateTime.now().minusDays(1), "Dr. Priya Singh", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 2L, "VITAL_SIGNS", "Body Temperature", "99.2", "°F", "HIGH", java.time.LocalDateTime.now().minusDays(1), "Dr. Priya Singh", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 2L, "VITAL_SIGNS", "Weight", "78", "kg", "HIGH", java.time.LocalDateTime.now().minusDays(2), "Dr. Priya Singh", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 2L, "VITAL_SIGNS", "BMI", "28.5", "kg/m²", "HIGH", java.time.LocalDateTime.now().minusDays(2), "Dr. Priya Singh", java.time.LocalDateTime.now()));
+		
+		// Lab Results
+		healthRecordRepository.save(new HealthRecord(null, 2L, "LAB_RESULTS", "Blood Sugar (Fasting)", "125", "mg/dL", "HIGH", java.time.LocalDateTime.now().minusDays(3), "Dr. Priya Singh", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 2L, "LAB_RESULTS", "Total Cholesterol", "240", "mg/dL", "HIGH", java.time.LocalDateTime.now().minusDays(5), "Dr. Priya Singh", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 2L, "LAB_RESULTS", "HbA1c", "6.8", "%", "HIGH", java.time.LocalDateTime.now().minusDays(7), "Dr. Priya Singh", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 2L, "LAB_RESULTS", "Triglycerides", "180", "mg/dL", "HIGH", java.time.LocalDateTime.now().minusDays(5), "Dr. Priya Singh", java.time.LocalDateTime.now()));
+		
+		// Medications
+		healthRecordRepository.save(new HealthRecord(null, 2L, "MEDICATION", "Metformin", "500", "mg twice daily", "NORMAL", java.time.LocalDateTime.now().minusDays(10), "Dr. Priya Singh", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 2L, "MEDICATION", "Lisinopril", "10", "mg daily", "NORMAL", java.time.LocalDateTime.now().minusDays(15), "Dr. Priya Singh", java.time.LocalDateTime.now()));
+		
+		// Patient 3 (Kiran Patel) - Healthy Profile
+		// Vital Signs
+		healthRecordRepository.save(new HealthRecord(null, 3L, "VITAL_SIGNS", "Blood Pressure", "115/75", "mmHg", "NORMAL", java.time.LocalDateTime.now().minusDays(2), "Dr. Amit Patel", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 3L, "VITAL_SIGNS", "Heart Rate", "68", "bpm", "NORMAL", java.time.LocalDateTime.now().minusDays(2), "Dr. Amit Patel", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 3L, "VITAL_SIGNS", "Weight", "65", "kg", "NORMAL", java.time.LocalDateTime.now().minusDays(3), "Dr. Amit Patel", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 3L, "VITAL_SIGNS", "BMI", "21.8", "kg/m²", "NORMAL", java.time.LocalDateTime.now().minusDays(3), "Dr. Amit Patel", java.time.LocalDateTime.now()));
+		
+		// Lab Results
+		healthRecordRepository.save(new HealthRecord(null, 3L, "LAB_RESULTS", "Blood Sugar (Fasting)", "88", "mg/dL", "NORMAL", java.time.LocalDateTime.now().minusDays(10), "Dr. Amit Patel", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 3L, "LAB_RESULTS", "Total Cholesterol", "165", "mg/dL", "NORMAL", java.time.LocalDateTime.now().minusDays(20), "Dr. Amit Patel", java.time.LocalDateTime.now()));
+		healthRecordRepository.save(new HealthRecord(null, 3L, "LAB_RESULTS", "Vitamin B12", "350", "pg/mL", "NORMAL", java.time.LocalDateTime.now().minusDays(25), "Dr. Amit Patel", java.time.LocalDateTime.now()));
+		
+		System.out.println("Created comprehensive health records for all patients");
 	}
 }
