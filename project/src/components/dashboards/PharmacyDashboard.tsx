@@ -49,7 +49,8 @@ const PharmacyDashboard = () => {
     stockIncrease: ''
   });
 
-  const pharmacyId = 1; // Fixed pharmacy ID for testing
+  // Get pharmacy ID from user context - each pharmacy user has unique ID
+  const pharmacyId = user?.id || 1; // Use logged-in pharmacy user's ID
 
   useEffect(() => {
     loadMedicines();

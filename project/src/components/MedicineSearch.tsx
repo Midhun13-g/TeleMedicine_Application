@@ -11,6 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 const MedicineSearch = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [medicines, setMedicines] = useState<MedicineStock[]>([]);
+  const [medicineAvailability, setMedicineAvailability] = useState<any[]>([]);
+  const [pharmacies, setPharmacies] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [favorites, setFavorites] = useState<number[]>([]);
@@ -18,12 +20,17 @@ const MedicineSearch = () => {
   const [sortBy, setSortBy] = useState('name');
   const [priceRange, setPriceRange] = useState({ min: '', max: '' });
   const [showAvailableOnly, setShowAvailableOnly] = useState(true);
+  const [searchMode, setSearchMode] = useState<'all' | 'availability'>('all');
   const { toast } = useToast();
 
   useEffect(() => {
     loadAllMedicines();
+    loadPharmacies();
     // Auto-refresh every 10 seconds for real-time updates
-    const interval = setInterval(loadAllMedicines, 10000);
+    const interval = setInterval(() => {
+      loadAllMedicines();
+      loadPharmacies();
+    }, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -43,9 +50,45 @@ const MedicineSearch = () => {
     }
   };
 
+  const loadPharmacies = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/api/pharmacies');
+      if (response.ok) {
+        const data = await response.json();
+        setPharmacies(data);
+      }
+    } catch (error) {
+      console.error('Error loading pharmacies:', error);
+    }
+  };
+
+  const checkMedicineAvailability = async (medicineName: string) => {
+    if (!medicineName.trim()) return;
+    
+    setLoading(true);
+    try {
+      const response = await fetch(`http://localhost:8080/api/pharmacies/medicine-availability/${encodeURIComponent(medicineName)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setMedicineAvailability(data);
+        setSearchMode('availability');
+      }
+    } catch (error) {
+      console.error('Error checking medicine availability:', error);
+      toast({
+        title: "Error",
+        description: "Failed to check medicine availability",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
       loadAllMedicines();
+      setSearchMode('all');
       return;
     }
 
@@ -55,6 +98,7 @@ const MedicineSearch = () => {
       if (response.ok) {
         const data = await response.json();
         setMedicines(data.filter((med: any) => med.available && med.stock > 0));
+        setSearchMode('all');
         setLastUpdated(new Date());
       }
     } catch (error) {
@@ -135,8 +179,15 @@ const MedicineSearch = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Find Medicines ({filteredMedicines.length} found)</CardTitle>
-          <CardDescription>Search for available medicines across pharmacies</CardDescription>
+          <CardTitle>
+            Find Medicines ({searchMode === 'availability' ? medicineAvailability.length : filteredMedicines.length} found)
+          </CardTitle>
+          <CardDescription>
+            {searchMode === 'availability' 
+              ? `Checking availability of "${searchQuery}" across all pharmacies`
+              : 'Search for available medicines across pharmacies'
+            }
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex space-x-2">
@@ -145,10 +196,18 @@ const MedicineSearch = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1"
+              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
             />
             <Button onClick={handleSearch} disabled={loading}>
               <Search className="h-4 w-4 mr-2" />
               Search
+            </Button>
+            <Button 
+              onClick={() => checkMedicineAvailability(searchQuery)} 
+              disabled={loading || !searchQuery.trim()}
+              variant="outline"
+            >
+              📍 Check Availability
             </Button>
           </div>
           
@@ -222,86 +281,195 @@ const MedicineSearch = () => {
             </p>
           </CardContent>
         </Card>
-      ) : (
-        <div className="space-y-6">
-          {Object.entries(groupedMedicines).map(([pharmacyId, pharmacyMedicines]) => (
-            <Card key={pharmacyId}>
+      ) : searchMode === 'availability' ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Medicine Availability: "{searchQuery}"</h2>
+            <Button onClick={() => { setSearchMode('all'); loadAllMedicines(); }} variant="outline" size="sm">
+              ← Back to All Medicines
+            </Button>
+          </div>
+          
+          {medicineAvailability.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-8">
+                <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-medium mb-2">Medicine not found</h3>
+                <p className="text-muted-foreground">
+                  "{searchQuery}" is not available in any pharmacy
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center">
-                      <Package className="h-5 w-5 mr-2" />
-                      Pharmacy ID: {pharmacyId}
-                    </CardTitle>
-                    <CardDescription>
-                      {pharmacyMedicines.length} medicine(s) available
-                    </CardDescription>
-                  </div>
-                </div>
+                <CardTitle>Available at {medicineAvailability.filter(p => p.available).length} pharmacy(ies)</CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Medicine</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Price</TableHead>
+                      <TableHead>Pharmacy</TableHead>
+                      <TableHead>Address</TableHead>
+                      <TableHead>Contact</TableHead>
                       <TableHead>Availability</TableHead>
-                      <TableHead>Manufacturer</TableHead>
+                      <TableHead>Stock</TableHead>
+                      <TableHead>Price</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pharmacyMedicines.map((medicine) => {
-                      const status = getStockStatus(medicine.stock, medicine.minStockLevel);
-                      return (
-                        <TableRow key={medicine.id}>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={() => toggleFavorite(medicine.id)}
-                                className={`text-lg ${favorites.includes(medicine.id) ? 'text-red-500' : 'text-gray-300'}`}
-                              >
-                                ❤️
-                              </button>
-                              <div>
-                                <div className="font-medium">{medicine.name}</div>
-                                <div className="text-sm text-gray-500">{medicine.dosage || 'N/A'}</div>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>{medicine.category || 'N/A'}</TableCell>
-                          <TableCell>
-                            <div className="font-medium">₹{medicine.price}</div>
-                            <div className="text-sm text-gray-500">per unit</div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <span>{medicine.stock} units</span>
-                              <Badge variant={status.variant} className="text-xs">{status.label}</Badge>
-                            </div>
-                          </TableCell>
-                          <TableCell>{medicine.manufacturer || 'N/A'}</TableCell>
-                          <TableCell>
-                            <div className="flex space-x-1">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => requestMedicine(medicine.name, medicine.pharmacyId)}
-                                disabled={medicine.stock === 0}
-                              >
-                                📞 Request
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {medicineAvailability.map((pharmacy) => (
+                      <TableRow key={pharmacy.pharmacyId}>
+                        <TableCell>
+                          <div className="font-medium">{pharmacy.pharmacyName}</div>
+                          <div className="text-sm text-gray-500">ID: {pharmacy.pharmacyId}</div>
+                        </TableCell>
+                        <TableCell className="text-sm">{pharmacy.address}</TableCell>
+                        <TableCell className="text-sm">{pharmacy.contact}</TableCell>
+                        <TableCell>
+                          <Badge variant={pharmacy.available ? 'default' : 'destructive'}>
+                            {pharmacy.available ? 'Available' : 'Not Available'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className={pharmacy.stock > 0 ? 'text-green-600' : 'text-red-600'}>
+                            {pharmacy.stock} units
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {pharmacy.price ? (
+                            <div className="font-medium">₹{pharmacy.price}</div>
+                          ) : (
+                            <span className="text-gray-400">N/A</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-1">
+                            <Button
+                              size="sm"
+                              variant={pharmacy.available ? 'default' : 'outline'}
+                              onClick={() => requestMedicine(searchQuery, pharmacy.pharmacyId)}
+                              disabled={!pharmacy.available}
+                            >
+                              {pharmacy.available ? '📞 Call' : '❌ Unavailable'}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </CardContent>
             </Card>
-          ))}
+          )}
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {Object.entries(groupedMedicines).map(([pharmacyId, pharmacyMedicines]) => {
+            // Get pharmacy info from the first medicine in the group (all medicines from same pharmacy have same info)
+            const firstMedicine = pharmacyMedicines[0];
+            const pharmacyInfo = {
+              name: firstMedicine.pharmacyName || `Pharmacy ID: ${pharmacyId}`,
+              address: firstMedicine.pharmacyAddress || 'Address not available',
+              contact: firstMedicine.pharmacyContact || 'Contact not available',
+              rating: firstMedicine.pharmacyRating || 4.0,
+              hours: firstMedicine.pharmacyHours || 'Contact for hours',
+              is24Hours: firstMedicine.is24Hours || false
+            };
+            
+            return (
+              <Card key={pharmacyId}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center">
+                        <Package className="h-5 w-5 mr-2" />
+                        {pharmacyInfo.name}
+                        {pharmacyInfo.is24Hours && <Badge variant="secondary" className="ml-2">24/7</Badge>}
+                      </CardTitle>
+                      <CardDescription>
+                        <div className="space-y-1">
+                          <div>📍 {pharmacyInfo.address}</div>
+                          <div className="text-sm">📞 {pharmacyInfo.contact} • ⭐ {pharmacyInfo.rating}/5</div>
+                          <div className="text-sm">🕒 {pharmacyInfo.hours}</div>
+                        </div>
+                        {pharmacyMedicines.length} medicine(s) available
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Medicine</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Price</TableHead>
+                        <TableHead>Availability</TableHead>
+                        <TableHead>Manufacturer</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pharmacyMedicines.map((medicine) => {
+                        const status = getStockStatus(medicine.stock, medicine.minStockLevel);
+                        return (
+                          <TableRow key={medicine.id}>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  onClick={() => toggleFavorite(medicine.id)}
+                                  className={`text-lg ${favorites.includes(medicine.id) ? 'text-red-500' : 'text-gray-300'}`}
+                                >
+                                  ❤️
+                                </button>
+                                <div>
+                                  <div className="font-medium">{medicine.name}</div>
+                                  <div className="text-sm text-gray-500">{medicine.dosage || 'N/A'}</div>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>{medicine.category || 'N/A'}</TableCell>
+                            <TableCell>
+                              <div className="font-medium">₹{medicine.price}</div>
+                              <div className="text-sm text-gray-500">per unit</div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <span>{medicine.stock} units</span>
+                                <Badge variant={status.variant} className="text-xs">{status.label}</Badge>
+                              </div>
+                            </TableCell>
+                            <TableCell>{medicine.manufacturer || 'N/A'}</TableCell>
+                            <TableCell>
+                              <div className="flex space-x-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => requestMedicine(medicine.name, medicine.pharmacyId)}
+                                  disabled={medicine.stock === 0}
+                                >
+                                  📞 Request
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => checkMedicineAvailability(medicine.name)}
+                                >
+                                  📍 Check Other Pharmacies
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

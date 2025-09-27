@@ -52,7 +52,7 @@ export const VideoCall: React.FC<VideoCallProps> = ({ userId, targetUserId, room
       }
       socket.disconnect();
       setSocket(null);
-      console.log('📡 Disconnected socket');
+      console.log('📡 Disconnected Socket.io');
     }
     
     const audioElements = document.querySelectorAll('audio[style*="display: none"]');

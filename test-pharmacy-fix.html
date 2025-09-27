@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Pharmacy ID Fix</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        button { margin: 5px; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Pharmacy ID Fix Test</h1>
+    
+    <button onclick="testPharmacyUsers()">1. Test Pharmacy Users</button>
+    <button onclick="testPharmacyEntities()">2. Test Pharmacy Entities</button>
+    <button onclick="testAddMedicine()">3. Test Add Medicine</button>
+    
+    <div id="results"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api';
+        
+        async function testPharmacyUsers() {
+            const results = document.getElementById('results');
+            results.innerHTML += '<div class="result">🔍 Testing pharmacy users...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/users`);
+                const users = await response.json();
+                const pharmacyUsers = users.filter(u => u.role === 'PHARMACY');
+                
+                results.innerHTML += `<div class="result success">✅ Found ${pharmacyUsers.length} pharmacy users:</div>`;
+                pharmacyUsers.forEach(user => {
+                    results.innerHTML += `<div class="result">ID: ${user.id}, Name: ${user.name}, Email: ${user.email}</div>`;
+                });
+            } catch (error) {
+                results.innerHTML += `<div class="result error">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
+        async function testPharmacyEntities() {
+            const results = document.getElementById('results');
+            results.innerHTML += '<div class="result">🔍 Testing pharmacy entities...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/pharmacies`);
+                const pharmacies = await response.json();
+                
+                results.innerHTML += `<div class="result success">✅ Found ${pharmacies.length} pharmacy entities:</div>`;
+                pharmacies.forEach(pharmacy => {
+                    results.innerHTML += `<div class="result">ID: ${pharmacy.id}, Name: ${pharmacy.name}, Contact: ${pharmacy.contact}</div>`;
+                });
+            } catch (error) {
+                results.innerHTML += `<div class="result error">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
+        async function testAddMedicine() {
+            const results = document.getElementById('results');
+            results.innerHTML += '<div class="result">🔍 Testing medicine addition...</div>';
+            
+            // Test with pharmacy ID 7 (first pharmacy user)
+            const medicineData = {
+                name: "Test Medicine Fix",
+                stock: 25,
+                price: 15.0,
+                category: "Pain Relief",
+                manufacturer: "Test Pharma",
+                pharmacyId: 7,
+                available: true,
+                minStockLevel: 10
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/medicines/add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(medicineData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    results.innerHTML += `<div class="result success">✅ Medicine added successfully! ID: ${result.medicine.id}</div>`;
+                } else {
+                    results.innerHTML += `<div class="result error">❌ Failed: ${result.message}</div>`;
+                }
+            } catch (error) {
+                results.innerHTML += `<div class="result error">❌ Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

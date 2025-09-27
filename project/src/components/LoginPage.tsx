@@ -103,16 +103,13 @@ const LoginPage = () => {
             <div className="space-y-6">
               <div className="inline-flex items-center space-x-2 bg-success/10 px-4 py-2 rounded-full text-success font-medium text-sm animate-bounce-gentle">
                 <Heart className="h-4 w-4" />
-                <span>Trusted by 10,000+ Patients</span>
+                <span>{t('loginTrusted')}</span>
               </div>
               <h2 className="text-5xl font-bold text-foreground leading-tight">
-                Connecting Rural Communities to
-                <span className="gradient-text"> Quality Healthcare</span>
+                {t('loginHeadline')}
               </h2>
               <p className="text-xl text-muted-foreground leading-relaxed">
-                Bridge the healthcare gap with our comprehensive telemedicine platform. 
-                Get expert consultations, digital prescriptions, and medicine availability 
-                checks from the comfort of your village.
+                {t('loginSubheadline')}
               </p>
 
               {/* Feature highlights */}

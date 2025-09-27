@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medicine Search Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { margin: 10px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .pharmacy-info { background: #f5f5f5; padding: 10px; margin: 5px 0; border-radius: 3px; }
+        .medicine-info { background: #e8f4fd; padding: 10px; margin: 5px 0; border-radius: 3px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        input { padding: 8px; margin: 5px; width: 300px; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Medicine Search Test</h1>
+    
+    <div>
+        <input type="text" id="searchInput" placeholder="Enter medicine name (e.g., Paracetamol)" value="Paracetamol">
+        <button onclick="searchMedicines()">Search Medicines</button>
+        <button onclick="checkAvailability()">Check Availability</button>
+    </div>
+    
+    <div id="results"></div>
+
+    <script>
+        async function searchMedicines() {
+            const query = document.getElementById('searchInput').value;
+            const resultsDiv = document.getElementById('results');
+            
+            try {
+                resultsDiv.innerHTML = '<p>🔄 Searching medicines...</p>';
+                
+                const response = await fetch(`http://localhost:8080/api/medicines/search?q=${encodeURIComponent(query)}`);
+                const medicines = await response.json();
+                
+                if (medicines.length === 0) {
+                    resultsDiv.innerHTML = '<p class="error">❌ No medicines found</p>';
+                    return;
+                }
+                
+                let html = `<h2 class="success">✅ Found ${medicines.length} medicine(s)</h2>`;
+                
+                medicines.forEach(medicine => {
+                    html += `
+                        <div class="result">
+                            <div class="medicine-info">
+                                <h3>💊 ${medicine.name}</h3>
+                                <p><strong>Manufacturer:</strong> ${medicine.manufacturer || 'N/A'}</p>
+                                <p><strong>Category:</strong> ${medicine.category || 'N/A'}</p>
+                                <p><strong>Price:</strong> ₹${medicine.price}</p>
+                                <p><strong>Stock:</strong> ${medicine.stock} units</p>
+                                <p><strong>Available:</strong> ${medicine.available ? '✅ Yes' : '❌ No'}</p>
+                            </div>
+                            <div class="pharmacy-info">
+                                <h4>🏥 Pharmacy Information</h4>
+                                <p><strong>Name:</strong> ${medicine.pharmacyName || 'Unknown'}</p>
+                                <p><strong>Address:</strong> ${medicine.pharmacyAddress || 'N/A'}</p>
+                                <p><strong>Contact:</strong> ${medicine.pharmacyContact || 'N/A'}</p>
+                                <p><strong>Rating:</strong> ${medicine.pharmacyRating || 'N/A'} ⭐</p>
+                                <p><strong>Hours:</strong> ${medicine.pharmacyHours || 'N/A'}</p>
+                                <p><strong>24/7:</strong> ${medicine.is24Hours ? '✅ Yes' : '❌ No'}</p>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                resultsDiv.innerHTML = html;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+                console.error('Search error:', error);
+            }
+        }
+        
+        async function checkAvailability() {
+            const query = document.getElementById('searchInput').value;
+            const resultsDiv = document.getElementById('results');
+            
+            try {
+                resultsDiv.innerHTML = '<p>🔄 Checking availability across pharmacies...</p>';
+                
+                const response = await fetch(`http://localhost:8080/api/pharmacies/medicine-availability/${encodeURIComponent(query)}`);
+                const availability = await response.json();
+                
+                let html = `<h2>📍 Availability Check for "${query}"</h2>`;
+                
+                availability.forEach(pharmacy => {
+                    html += `
+                        <div class="result">
+                            <div class="pharmacy-info">
+                                <h3>🏥 ${pharmacy.pharmacyName}</h3>
+                                <p><strong>ID:</strong> ${pharmacy.pharmacyId}</p>
+                                <p><strong>Address:</strong> ${pharmacy.address}</p>
+                                <p><strong>Contact:</strong> ${pharmacy.contact}</p>
+                                <p><strong>Rating:</strong> ${pharmacy.rating} ⭐</p>
+                                <p><strong>Hours:</strong> ${pharmacy.openHours}</p>
+                                <p><strong>24/7:</strong> ${pharmacy.is24Hours ? '✅ Yes' : '❌ No'}</p>
+                                <p><strong>Available:</strong> ${pharmacy.available ? '✅ Yes' : '❌ No'}</p>
+                                <p><strong>Stock:</strong> ${pharmacy.stock} units</p>
+                                <p><strong>Price:</strong> ${pharmacy.price ? '₹' + pharmacy.price : 'N/A'}</p>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                resultsDiv.innerHTML = html;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+                console.error('Availability check error:', error);
+            }
+        }
+        
+        // Auto-search on page load
+        window.onload = () => searchMedicines();
+    </script>
+</body>
+</html>

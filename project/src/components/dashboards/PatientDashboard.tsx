@@ -21,6 +21,7 @@ import { pharmacyService, type Pharmacy } from '@/services/pharmacyService';
 import { prescriptionService, type Prescription } from '@/services/prescriptionService';
 import { realtimeService } from '@/services/realtimeService';
 import MedicineSearch from '@/components/MedicineSearch';
+import HealthRecords from '@/components/HealthRecords';
 import io from 'socket.io-client';
 
 const PatientDashboard = () => {
@@ -431,6 +432,9 @@ const PatientDashboard = () => {
     return 'Thank you for sharing your symptoms. Based on what you\'ve described, I recommend consulting with a healthcare professional for proper evaluation. Would you like me to help you schedule an appointment with one of our doctors?';
   };
 
+  const [medicineAvailability, setMedicineAvailability] = useState([]);
+  const [showAvailability, setShowAvailability] = useState(false);
+
   const searchMedicine = async () => {
     if (!medicineSearch.trim()) {
       toast({
@@ -445,6 +449,7 @@ const PatientDashboard = () => {
     try {
       const results = await medicineService.searchMedicines(medicineSearch);
       setMedicineResults(results);
+      setShowAvailability(false);
       
       if (results.length === 0) {
         toast({
@@ -461,6 +466,57 @@ const PatientDashboard = () => {
       toast({
         title: 'Search Failed',
         description: 'Unable to search medicines at the moment',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSearchingMedicine(false);
+    }
+  };
+
+  const checkMedicineAvailabilityInPharmacies = async (medicineName: string) => {
+    setIsSearchingMedicine(true);
+    try {
+      console.log('🔍 Checking availability for:', medicineName);
+      const response = await fetch(`http://localhost:8080/api/pharmacies/medicine-availability/${encodeURIComponent(medicineName)}`);
+      if (response.ok) {
+        const availability = await response.json();
+        console.log('🔍 Raw API response:', availability);
+        console.log('🔍 Response length:', availability.length);
+        
+        // Debug each pharmacy entry
+        availability.forEach((pharmacy, index) => {
+          console.log(`🏥 Pharmacy ${index + 1}:`);
+          console.log('  - ID:', pharmacy.pharmacyId);
+          console.log('  - Name:', pharmacy.pharmacyName);
+          console.log('  - Address:', pharmacy.address);
+          console.log('  - Contact:', pharmacy.contact);
+          console.log('  - Available:', pharmacy.available);
+          console.log('  - Stock:', pharmacy.stock);
+          console.log('  - Price:', pharmacy.price);
+        });
+        
+        setMedicineAvailability(availability);
+        setShowAvailability(true);
+        setMedicineResults([]);
+        
+        const availableCount = availability.filter(p => p.available).length;
+        toast({
+          title: 'Availability Check Complete',
+          description: `${medicineName} is available at ${availableCount} pharmacy(ies)`,
+        });
+      } else {
+        console.error('❌ API response not ok:', response.status, response.statusText);
+        toast({
+          title: 'Check Failed',
+          description: 'Unable to check medicine availability',
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error checking availability:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to check medicine availability',
         variant: 'destructive'
       });
     } finally {
@@ -939,6 +995,20 @@ const PatientDashboard = () => {
             </CardContent>
           </Card>
           
+          {/* Digital Health Records */}
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <FileText className="h-5 w-5 text-primary" />
+                <span>Digital Health Records</span>
+              </CardTitle>
+              <CardDescription>Your latest health data and vitals</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <HealthRecords patientId={user?.id} />
+            </CardContent>
+          </Card>
+
           {/* Health Reminders */}
           <Card className="shadow-card">
             <CardHeader>
@@ -1468,7 +1538,12 @@ const PatientDashboard = () => {
           <Card className="shadow-card">
             <CardHeader>
               <CardTitle>Medicine Availability</CardTitle>
-              <CardDescription>Check if medicines are available at nearby pharmacies</CardDescription>
+              <CardDescription>
+                {showAvailability 
+                  ? `Showing availability of "${medicineSearch}" across all pharmacies`
+                  : 'Check if medicines are available at nearby pharmacies'
+                }
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex space-x-2">
@@ -1477,6 +1552,7 @@ const PatientDashboard = () => {
                   value={medicineSearch}
                   onChange={(e) => setMedicineSearch(e.target.value)}
                   className="flex-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                  onKeyPress={(e) => e.key === 'Enter' && searchMedicine()}
                 />
                 <Button 
                   onClick={searchMedicine} 
@@ -1487,36 +1563,181 @@ const PatientDashboard = () => {
                   <Search className="h-4 w-4" />
                   {isSearchingMedicine ? 'Searching...' : 'Search'}
                 </Button>
+                <Button 
+                  onClick={() => checkMedicineAvailabilityInPharmacies(medicineSearch)} 
+                  variant="outline" 
+                  className="hover:scale-105 transition-transform"
+                  disabled={isSearchingMedicine || !medicineSearch.trim()}
+                >
+                  📍 Check Availability
+                </Button>
               </div>
 
+              {/* Medicine Availability Results */}
+              {showAvailability && medicineAvailability.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-medium">Medicine Availability: "{medicineSearch}"</h4>
+                    <Button 
+                      onClick={() => {
+                        setShowAvailability(false);
+                        setMedicineAvailability([]);
+                      }} 
+                      variant="outline" 
+                      size="sm"
+                    >
+                      ← Back to Search
+                    </Button>
+                  </div>
+                  <div className="space-y-3">
+                    {medicineAvailability.map((pharmacy, index) => (
+                      <div key={index} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                              <Building2 className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                              <h5 className="font-medium">
+                                {pharmacy.pharmacyName || `Pharmacy #${pharmacy.pharmacyId}` || 'Unknown Pharmacy'}
+                              </h5>
+                              <p className="text-sm text-muted-foreground">ID: {pharmacy.pharmacyId}</p>
+                              {!pharmacy.pharmacyName && (
+                                <p className="text-xs text-red-500">⚠️ Name missing from API</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <Badge variant={pharmacy.available ? 'default' : 'destructive'}>
+                              {pharmacy.available ? '✅ Available' : '❌ Not Available'}
+                            </Badge>
+                            {pharmacy.available && (
+                              <p className="text-sm text-green-600 mt-1">
+                                Stock: {pharmacy.stock} units
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="grid md:grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <p className="text-muted-foreground mb-1">📍 Address:</p>
+                            <p>{pharmacy.address || 'Address not available'}</p>
+                            {!pharmacy.address && (
+                              <p className="text-xs text-red-500">⚠️ Address missing from API</p>
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground mb-1">📞 Contact:</p>
+                            <p className="font-medium text-primary">{pharmacy.contact || 'Contact not available'}</p>
+                            {!pharmacy.contact && (
+                              <p className="text-xs text-red-500">⚠️ Contact missing from API</p>
+                            )}
+                          </div>
+                          {pharmacy.openHours && (
+                            <div>
+                              <p className="text-muted-foreground mb-1">🕒 Hours:</p>
+                              <p>{pharmacy.openHours}</p>
+                              {pharmacy.is24Hours && (
+                                <Badge variant="outline" className="text-xs mt-1">24 Hours</Badge>
+                              )}
+                            </div>
+                          )}
+                          {pharmacy.rating && (
+                            <div>
+                              <p className="text-muted-foreground mb-1">⭐ Rating:</p>
+                              <div className="flex items-center space-x-1">
+                                <span>{pharmacy.rating}</span>
+                                <div className="flex">
+                                  {[...Array(5)].map((_, i) => (
+                                    <Star key={i} className={`h-3 w-3 ${i < pharmacy.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {pharmacy.available && (
+                          <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                            <div>
+                              {pharmacy.price && (
+                                <p className="font-medium text-lg text-green-600">₹{pharmacy.price}</p>
+                              )}
+                              {pharmacy.manufacturer && (
+                                <p className="text-sm text-muted-foreground">by {pharmacy.manufacturer}</p>
+                              )}
+                            </div>
+                            <div className="flex space-x-2">
+                              <Button size="sm" variant="outline">
+                                📞 Call Pharmacy
+                              </Button>
+                              <Button size="sm" variant="success">
+                                📍 Get Directions
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {medicineAvailability.filter(p => p.available).length === 0 && (
+                    <div className="text-center py-8 bg-muted/30 rounded-lg">
+                      <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Search className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                      <p className="text-muted-foreground mb-2">"{medicineSearch}" is not available</p>
+                      <p className="text-sm text-muted-foreground">Try searching for alternative medicines or contact pharmacies directly</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Medicine Search Results */}
-              {medicineResults.length > 0 && (
+              {!showAvailability && medicineResults.length > 0 && (
                 <div>
                   <h4 className="font-medium mb-2">Search Results</h4>
                   <div className="space-y-2">
                     {medicineResults.map((medicine) => (
                       <div key={medicine.id} className="border rounded-lg p-3 hover:shadow-md transition-shadow">
                         <div className="flex items-center justify-between">
-                          <div>
+                          <div className="flex-1">
                             <h5 className="font-medium">{medicine.name}</h5>
                             <p className="text-sm text-muted-foreground">{medicine.manufacturer} • {medicine.category}</p>
                             <p className="text-sm">{medicine.description}</p>
+                            <div className="flex items-center space-x-2 mt-2">
+                              <Building2 className="h-4 w-4 text-primary" />
+                              <span className="text-sm font-medium text-primary">{medicine.pharmacyName || 'Unknown Pharmacy'}</span>
+                              <Badge variant="outline" className="text-xs">ID: {medicine.pharmacyId}</Badge>
+                            </div>
+                            {medicine.pharmacyAddress && (
+                              <p className="text-xs text-muted-foreground mt-1">📍 {medicine.pharmacyAddress}</p>
+                            )}
                           </div>
                           <div className="text-right">
                             <p className="font-medium">₹{medicine.price}</p>
                             <Badge variant={medicine.available ? 'default' : 'secondary'}>
                               {medicine.available ? 'Available' : 'Out of Stock'}
                             </Badge>
+                            {medicine.stock && (
+                              <p className="text-xs text-muted-foreground mt-1">{medicine.stock} units</p>
+                            )}
                           </div>
                         </div>
-                        <div className="flex gap-2 mt-2">
+                        <div className="flex gap-2 mt-3 pt-2 border-t">
                           <Button 
                             size="sm" 
                             variant="outline"
-                            onClick={() => checkMedicineAvailability(medicine.name)}
+                            onClick={() => checkMedicineAvailabilityInPharmacies(medicine.name)}
                           >
-                            Check Availability
+                            📍 Check All Pharmacies
                           </Button>
+                          {medicine.pharmacyContact && (
+                            <Button size="sm" variant="ghost">
+                              📞 {medicine.pharmacyContact}
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1525,22 +1746,30 @@ const PatientDashboard = () => {
               )}
               
               {/* Popular medicines */}
-              <div>
-                <h4 className="font-medium mb-2">Popular Medicines</h4>
-                <div className="flex flex-wrap gap-2">
-                  {['Paracetamol', 'Azithromycin', 'Cetirizine', 'Amoxicillin'].map((medicine) => (
-                    <Button
-                      key={medicine}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setMedicineSearch(medicine)}
-                      className="hover:scale-105 transition-transform"
-                    >
-                      {medicine}
-                    </Button>
-                  ))}
+              {!showAvailability && (
+                <div>
+                  <h4 className="font-medium mb-2">Popular Medicines</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {['Paracetamol', 'Azithromycin', 'Cetirizine', 'Amoxicillin'].map((medicine) => (
+                      <Button
+                        key={medicine}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setMedicineSearch(medicine);
+                          checkMedicineAvailabilityInPharmacies(medicine);
+                        }}
+                        className="hover:scale-105 transition-transform"
+                      >
+                        📍 {medicine}
+                      </Button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    💡 Click on any medicine to check its availability across pharmacies
+                  </p>
                 </div>
-              </div>
+              )}
               
               {/* Nearby Pharmacies */}
               {nearbyPharmacies.length > 0 && (
