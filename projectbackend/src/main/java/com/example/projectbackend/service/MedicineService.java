@@ -51,4 +51,8 @@ public class MedicineService {
         return medicineRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Medicine not found"));
     }
+    
+    public List<Medicine> getAllMedicines() {
+        return medicineRepository.findAll();
+    }
 }
